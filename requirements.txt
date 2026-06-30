@@ -1,0 +1,56 @@
+# 台灣股票分析工具 - 依賴套件
+# 資料處理
+pandas>=1.5.0
+numpy>=1.21.0
+python-dateutil>=2.8.0
+
+# 資料庫
+sqlalchemy>=1.4.0
+psycopg2-binary>=2.9.0
+redis>=4.0.0
+
+# Web框架
+fastapi>=0.68.0
+uvicorn>=0.15.0
+pydantic>=1.8.0
+
+# 資料取得
+yfinance>=0.2.0
+requests>=2.25.0
+aiohttp>=3.8.0
+
+# 技術分析
+ta-lib>=0.4.24
+pandas-ta>=0.3.14b
+
+# 機器學習
+scikit-learn>=1.0.0
+tensorflow>=2.8.0
+torch>=1.11.0
+xgboost>=1.6.0
+
+# 視覺化
+matplotlib>=3.5.0
+plotly>=5.0.0
+bokeh>=2.4.0
+
+# AI Agent整合
+langchain>=0.0.100
+openai>=0.27.0
+
+# 工具
+python-dotenv>=0.19.0
+loguru>=0.6.0
+schedule>=1.1.0
+APScheduler>=3.9.0
+
+# 測試
+pytest>=7.0.0
+pytest-asyncio>=0.18.0
+httpx>=0.23.0
+
+# 開發工具
+black>=22.0.0
+flake8>=4.0.0
+isort>=5.10.0
+mypy>=0.900
