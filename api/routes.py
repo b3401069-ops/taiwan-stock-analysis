@@ -12,6 +12,7 @@ from api.services import StockService, AnalysisService, RecommendationService
 from data.twse_fetcher import get_twse_fetcher
 from data.financial_fetcher import get_financial_fetcher
 from data.dividend_fetcher import get_dividend_fetcher
+from data.finmind_fetcher import get_finmind_fetcher
 from models.db_manager import get_db_manager
 from analysis.stock_analyst import get_stock_analyst
 from analysis.valuation_metrics import get_valuation_metrics
@@ -20,6 +21,7 @@ from analysis.backtest import get_backtest_engine, STRATEGIES
 from analysis.backtest_advanced import get_advanced_backtest_engine
 from analysis.virtual_portfolio import get_virtual_portfolio
 from analysis.research_report import get_research_report_generator
+from analysis.market_regime import get_market_regime_detector
 from services.scheduler import get_scheduler_service
 from agents.stock_chatbot import get_stock_chatbot
 
@@ -909,6 +911,73 @@ async def get_scheduler_status():
                 "jobs": scheduler.get_scheduled_jobs()
             }
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  FinMind 資料端點
+# ──────────────────────────────────────────────
+@router.get("/finmind/stock/{stock_id}", summary="FinMind 股票資料")
+async def get_finmind_stock_data(stock_id: str):
+    """從 FinMind 取得股票所有資料"""
+    try:
+        fetcher = get_finmind_fetcher()
+        return fetcher.get_all_data(stock_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/finmind/price/{stock_id}", summary="FinMind 日K線")
+async def get_finmind_price(stock_id: str):
+    """從 FinMind 取得日K線資料"""
+    try:
+        fetcher = get_finmind_fetcher()
+        return fetcher.get_stock_price(stock_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/finmind/institutional/{stock_id}", summary="FinMind 三大法人")
+async def get_finmind_institutional(stock_id: str):
+    """從 FinMind 取得三大法人資料"""
+    try:
+        fetcher = get_finmind_fetcher()
+        return fetcher.get_institutional_investors(stock_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/finmind/taiex", summary="FinMind 加權指數")
+async def get_finmind_taiex():
+    """從 FinMind 取得加權指數資料"""
+    try:
+        fetcher = get_finmind_fetcher()
+        return fetcher.get_taiex()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  市場狀態端點
+# ──────────────────────────────────────────────
+@router.get("/market/regime", summary="市場狀態偵測")
+async def get_market_regime(stock_id: str = Query("^TWII", description="股票代碼")):
+    """偵測目前市場狀態（牛市/熊市/盤整/危機）"""
+    try:
+        detector = get_market_regime_detector()
+        return detector.detect_regime(stock_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/market/regime/history", summary="市場狀態歷史")
+async def get_market_regime_history():
+    """取得市場狀態歷史記錄"""
+    try:
+        detector = get_market_regime_detector()
+        history = detector.get_regime_history()
+        return {"success": True, "data": history}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
