@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>進階分析測試</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        
+        .analysis-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .analysis-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        
+        .analysis-card h5 {
+            color: #667eea;
+            border-bottom: 2px solid #e8e8ff;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .btn-analysis {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .btn-analysis:hover {
+            background: linear-gradient(135deg, #5a6fd6 0%, #6a4294 100%);
+            color: white;
+        }
+        
+        .industry-item {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background-color: white;
+        }
+        
+        .industry-item:hover {
+            background-color: #f8f9ff;
+            border-color: #667eea;
+        }
+        
+        .industry-rank {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .industry-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .industry-strength {
+            font-weight: 700;
+            color: #28a745;
+            font-size: 18px;
+        }
+        
+        .signal-badge {
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .signal-strong-buy {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .signal-buy {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .signal-hold {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .signal-sell {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .concept-item {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background-color: white;
+        }
+        
+        .concept-item:hover {
+            background-color: #f8f9ff;
+            border-color: #667eea;
+        }
+        
+        .concept-heat {
+            font-weight: 700;
+            color: #dc3545;
+            font-size: 18px;
+        }
+        
+        .trend-badge {
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .trend-hot {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .trend-rising {
+            background-color: #fd7e14;
+            color: white;
+        }
+        
+        .trend-stable {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .trend-declining {
+            background-color: #6f42c1;
+            color: white;
+        }
+        
+        .trend-cold {
+            background-color: #343a40;
+            color: white;
+        }
+        
+        .ai-summary-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .ai-summary-card h5 {
+            color: #667eea;
+            border-bottom: 2px solid #e8e8ff;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .ai-summary-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .ai-advice-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .ai-warning-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #fff3cd;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- 標題 -->
+        <div class="analysis-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-chart-line me-2"></i>進階分析測試</h2>
+                    <p class="mb-0 opacity-75">產業輪動、概念股輪動、AI 選股摘要</p>
+                </div>
+                <div>
+                    <a href="/test" class="btn btn-outline-light me-2">
+                        <i class="fas fa-arrow-left me-2"></i>返回測試頁面
+                    </a>
+                    <a href="/app" class="btn btn-outline-light">
+                        <i class="fas fa-chart-line me-2"></i>儀表板
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 產業輪動分析 -->
+        <div class="analysis-card">
+            <h5><i class="fas fa-industry me-2"></i>產業輪動分析</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">分析期間</label>
+                        <select class="form-select" id="industryPeriod">
+                            <option value="3mo">3 個月</option>
+                            <option value="6mo" selected>6 個月</option>
+                            <option value="1y">1 年</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-analysis w-100" onclick="loadIndustryRotation()">
+                            <i class="fas fa-search me-2"></i>分析產業輪動
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="industryResults">
+                <p class="text-muted">點擊按鈕開始分析</p>
+            </div>
+        </div>
+        
+        <!-- 概念股輪動分析 -->
+        <div class="analysis-card">
+            <h5><i class="fas fa-lightbulb me-2"></i>概念股輪動分析</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">分析期間</label>
+                        <select class="form-select" id="conceptPeriod">
+                            <option value="3mo">3 個月</option>
+                            <option value="6mo" selected>6 個月</option>
+                            <option value="1y">1 年</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">最低熱度</label>
+                        <input type="range" class="form-range" id="minHeat" min="0" max="100" value="50">
+                        <div class="text-muted">熱度: <span id="minHeatValue">50%</span></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-analysis w-100" onclick="loadConceptRotation()">
+                            <i class="fas fa-search me-2"></i>分析概念股輪動
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="conceptResults">
+                <p class="text-muted">點擊按鈕開始分析</p>
+            </div>
+        </div>
+        
+        <!-- AI 選股摘要 -->
+        <div class="analysis-card">
+            <h5><i class="fas fa-robot me-2"></i>AI 選股摘要</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">股票池（可選）</label>
+                        <input type="text" class="form-control" id="aiStockUniverse" 
+                               placeholder="輸入股票代碼，以逗號分隔">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">返回前 N 名</label>
+                        <input type="number" class="form-control" id="aiTopN" value="10" min="1" max="50">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-analysis w-100" onclick="loadAISummary()">
+                            <i class="fas fa-robot me-2"></i>生成 AI 摘要
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="aiResults">
+                <p class="text-muted">點擊按鈕開始生成 AI 摘要</p>
+            </div>
+        </div>
+        
+        <!-- 說明 -->
+        <div class="analysis-card">
+            <h5><i class="fas fa-info-circle me-2"></i>功能說明</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="ai-advice-item">
+                        <h6>產業輪動分析</h6>
+                        <p>追蹤產業強度變化，識別輪動機會。根據動量、相對強度、周轉率和法人流等因素評估產業表現。</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="ai-advice-item">
+                        <h6>概念股輪動分析</h6>
+                        <p>追蹤熱門概念股輪動，包括 CoWoS、散熱、低軌衛星、AI 伺服器、車用電子等 8 個熱門概念。</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="ai-advice-item">
+                        <h6>AI 選股摘要</h6>
+                        <p>結合多因子選股、市場狀態、產業輪動、概念股輪動進行綜合分析，生成投資建議和風險提示。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/v1';
+        
+        // 設定熱度滑桿
+        window.onload = function() {
+            const heatSlider = document.getElementById('minHeat');
+            const heatValue = document.getElementById('minHeatValue');
+            
+            heatSlider.addEventListener('input', function() {
+                heatValue.textContent = this.value + '%';
+            });
+        };
+        
+        // 載入產業輪動分析
+        async function loadIndustryRotation() {
+            const period = document.getElementById('industryPeriod').value;
+            
+            try {
+                document.getElementById('industryResults').innerHTML = '<p class="text-muted">分析中，請稍候...</p>';
+                
+                const response = await fetch(`${API_BASE}/industry/rotation?period=${period}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateIndustryResults(data.data);
+                } else {
+                    document.getElementById('industryResults').innerHTML = 
+                        `<p class="text-danger">分析失敗: ${data.error || '未知錯誤'}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('industryResults').innerHTML = 
+                    `<p class="text-danger">錯誤: ${error.message}</p>`;
+            }
+        }
+        
+        // 更新產業輪動結果
+        function updateIndustryResults(data) {
+            const container = document.getElementById('industryResults');
+            
+            if (!data.industry_ranking || data.industry_ranking.length === 0) {
+                container.innerHTML = '<p class="text-muted">沒有產業輪動數據</p>';
+                return;
+            }
+            
+            let html = '<p class="mb-3">產業強度排名</p>';
+            
+            data.industry_ranking.forEach(industry => {
+                let signalClass = 'signal-hold';
+                if (industry.signal === 'strong_buy') signalClass = 'signal-strong-buy';
+                else if (industry.signal === 'buy') signalClass = 'signal-buy';
+                else if (industry.signal === 'sell') signalClass = 'signal-sell';
+                else if (industry.signal === 'strong_sell') signalClass = 'signal-sell';
+                
+                html += `
+                <div class="industry-item">
+                    <div class="row align-items-center">
+                        <div class="col-md-1 text-center">
+                            <div class="industry-rank">${industry.rank}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="industry-name">${industry.industry}</div>
+                            <div class="text-muted small">${industry.description}</div>
+                        </div>
+                        <div class="col-md-2 text-center">
+                            <div class="industry-strength">${industry.strength_score}</div>
+                            <div class="text-muted small">強度分數</div>
+                        </div>
+                        <div class="col-md-2 text-center">
+                            <div class="signal-badge ${signalClass}">${industry.signal}</div>
+                            <div class="text-muted small">信號</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="badge bg-secondary">20日: ${industry.momentum_20d}</span>
+                                <span class="badge bg-secondary">60日: ${industry.momentum_60d}</span>
+                                <span class="badge bg-secondary">相對強度: ${industry.relative_strength}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            
+            // 輪動機會
+            if (data.rotation_opportunities && data.rotation_opportunities.length > 0) {
+                html += '<p class="mt-4 mb-3">輪動機會</p>';
+                data.rotation_opportunities.forEach(opp => {
+                    html += `
+                    <div class="ai-advice-item">
+                        <h6>${opp.from_industry} → ${opp.to_industry}</h6>
+                        <p>信號強度: ${opp.signal_strength} | 預期報酬: ${opp.expected_return} | 風險: ${opp.risk_level}</p>
+                        <p class="text-muted">${opp.reason}</p>
+                    </div>`;
+                });
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // 載入概念股輪動分析
+        async function loadConceptRotation() {
+            const period = document.getElementById('conceptPeriod').value;
+            const minHeat = parseInt(document.getElementById('minHeat').value) / 100;
+            
+            try {
+                document.getElementById('conceptResults').innerHTML = '<p class="text-muted">分析中，請稍候...</p>';
+                
+                const response = await fetch(`${API_BASE}/concept/rotation?period=${period}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateConceptResults(data.data);
+                } else {
+                    document.getElementById('conceptResults').innerHTML = 
+                        `<p class="text-danger">分析失敗: ${data.error || '未知錯誤'}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('conceptResults').innerHTML = 
+                    `<p class="text-danger">錯誤: ${error.message}</p>`;
+            }
+        }
+        
+        // 更新概念股輪動結果
+        function updateConceptResults(data) {
+            const container = document.getElementById('conceptResults');
+            
+            if (!data.concept_ranking || data.concept_ranking.length === 0) {
+                container.innerHTML = '<p class="text-muted">沒有概念股輪動數據</p>';
+                return;
+            }
+            
+            let html = '<p class="mb-3">概念股熱度排名</p>';
+            
+            data.concept_ranking.forEach(concept => {
+                let trendClass = 'trend-stable';
+                if (concept.trend === 'hot') trendClass = 'trend-hot';
+                else if (concept.trend === 'rising') trendClass = 'trend-rising';
+                else if (concept.trend === 'declining') trendClass = 'trend-declining';
+                else if (concept.trend === 'cold') trendClass = 'trend-cold';
+                
+                html += `
+                <div class="concept-item">
+                    <div class="row align-items-center">
+                        <div class="col-md-1 text-center">
+                            <div class="industry-rank">${concept.rank}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="industry-name">${concept.concept}</div>
+                            <div class="text-muted small">${concept.description}</div>
+                        </div>
+                        <div class="col-md-2 text-center">
+                            <div class="concept-heat">${concept.heat_score}</div>
+                            <div class="text-muted small">熱度分數</div>
+                        </div>
+                        <div class="col-md-2 text-center">
+                            <div class="trend-badge ${trendClass}">${concept.trend}</div>
+                            <div class="text-muted small">趨勢</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="badge bg-secondary">20日: ${concept.avg_momentum_20d}</span>
+                                <span class="badge bg-secondary">60日: ${concept.avg_momentum_60d}</span>
+                                <span class="badge bg-secondary">周轉率: ${concept.avg_volume_ratio}</span>
+                                <span class="badge bg-secondary">法人流: ${concept.total_institutional_flow}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            
+            // 熱門概念股
+            if (data.hot_concepts && data.hot_concepts.length > 0) {
+                html += '<p class="mt-4 mb-3">熱門概念股</p>';
+                data.hot_concepts.forEach(concept => {
+                    html += `
+                    <div class="ai-advice-item">
+                        <h6>${concept.concept} <span class="badge bg-danger">${concept.trend}</span></h6>
+                        <p>${concept.description}</p>
+                        <p class="text-muted">熱度: ${concept.heat_score} | 股票數: ${concept.stocks.length}</p>
+                    </div>`;
+                });
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // 載入 AI 選股摘要
+        async function loadAISummary() {
+            const universeInput = document.getElementById('aiStockUniverse').value;
+            const topN = parseInt(document.getElementById('aiTopN').value);
+            
+            let universe = null;
+            if (universeInput.trim()) {
+                universe = universeInput.split(',').map(s => s.trim()).filter(s => s);
+            }
+            
+            try {
+                document.getElementById('aiResults').innerHTML = '<p class="text-muted">生成中，請稍候...</p>';
+                
+                const params = new URLSearchParams();
+                if (universe) {
+                    universe.forEach(stock => params.append('universe', stock));
+                }
+                params.append('top_n', topN);
+                params.append('include_analysis', true);
+                
+                const response = await fetch(`${API_BASE}/ai/summary?${params}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateAIResults(data.data);
+                } else {
+                    document.getElementById('aiResults').innerHTML = 
+                        `<p class="text-danger">生成失敗: ${data.error || '未知錯誤'}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('aiResults').innerHTML = 
+                    `<p class="text-danger">錯誤: ${error.message}</p>`;
+            }
+        }
+        
+        // 更新 AI 選股摘要結果
+        function updateAIResults(data) {
+            const container = document.getElementById('aiResults');
+            
+            let html = '';
+            
+            // 執行摘要
+            if (data.executive_summary) {
+                html += `
+                <div class="ai-summary-card">
+                    <h5><i class="fas fa-file-alt me-2"></i>執行摘要</h5>
+                    <div class="ai-summary-text">${data.executive_summary.replace(/\n/g, '<br>')}</div>
+                </div>`;
+            }
+            
+            // 投資建議
+            if (data.investment_advice) {
+                const advice = data.investment_advice;
+                html += `
+                <div class="ai-summary-card">
+                    <h5><i class="fas fa-lightbulb me-2"></i>投資建議</h5>
+                    <div class="ai-advice-item">
+                        <h6>市場建議</h6>
+                        <p>${advice.market_advice || 'N/A'}</p>
+                    </div>
+                    <div class="ai-advice-item">
+                        <h6>建議部位</h6>
+                        <p>${advice.position_size || 'N/A'}</p>
+                    </div>
+                    <div class="ai-advice-item">
+                        <h6>整體策略</h6>
+                        <p>${advice.overall_strategy || 'N/A'}</p>
+                    </div>
+                </div>`;
+                
+                // 選股推薦
+                if (advice.stock_recommendations && advice.stock_recommendations.length > 0) {
+                    html += `
+                    <div class="ai-summary-card">
+                        <h5><i class="fas fa-star me-2"></i>選股推薦</h5>`;
+                    
+                    advice.stock_recommendations.forEach(stock => {
+                        html += `
+                        <div class="ai-advice-item">
+                            <h6>${stock.rank}. ${stock.stock_name} (${stock.stock_id})</h6>
+                            <p>綜合分數: ${stock.composite_score} | ${stock.reason}</p>
+                        </div>`;
+                    });
+                    
+                    html += '</div>';
+                }
+            }
+            
+            // 風險提示
+            if (data.risk_warnings && data.risk_warnings.length > 0) {
+                html += `
+                <div class="ai-summary-card">
+                    <h5><i class="fas fa-exclamation-triangle me-2"></i>風險提示</h5>`;
+                
+                data.risk_warnings.forEach(warning => {
+                    html += `<div class="ai-warning-item">${warning}</div>`;
+                });
+                
+                html += '</div>';
+            }
+            
+            // 市場狀態
+            if (data.market_summary) {
+                const market = data.market_summary;
+                html += `
+                <div class="ai-summary-card">
+                    <h5><i class="fas fa-chart-pie me-2"></i>市場狀態</h5>
+                    <div class="ai-advice-item">
+                        <h6>市場狀態: ${market.regime_name || 'N/A'}</h6>
+                        <p>信心水平: ${market.confidence || 0}%</p>
+                        <p>${market.suggestion?.action || 'N/A'} - ${market.suggestion?.reason || 'N/A'}</p>
+                    </div>
+                </div>`;
+            }
+            
+            container.innerHTML = html || '<p class="text-muted">沒有 AI 選股摘要數據</p>';
+        }
+    </script>
+</body>
+</html>

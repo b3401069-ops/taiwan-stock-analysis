@@ -231,6 +231,16 @@ def create_app() -> FastAPI:
             with open(screener_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>多因子選股頁面不存在</h1>")
+    
+    # 添加進階分析測試頁面
+    @app.get("/advanced", response_class=HTMLResponse)
+    async def advanced_page():
+        """進階分析測試頁面"""
+        advanced_path = os.path.join(os.path.dirname(__file__), "static", "advanced_analysis_test.html")
+        if os.path.exists(advanced_path):
+            with open(advanced_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+        return HTMLResponse(content="<h1>進階分析頁面不存在</h1>")
 
     # 添加根端點
     @app.get("/")
@@ -247,6 +257,7 @@ def create_app() -> FastAPI:
             "report": "/report",
             "scheduler": "/scheduler",
             "screener": "/screener",
+            "advanced": "/advanced",
             "api": "/api/v1"
         }
     
