@@ -10,8 +10,11 @@ import pandas as pd
 from api.services import StockService, AnalysisService, RecommendationService
 from data.twse_fetcher import get_twse_fetcher
 from data.financial_fetcher import get_financial_fetcher
+from data.dividend_fetcher import get_dividend_fetcher
 from models.db_manager import get_db_manager
 from analysis.stock_analyst import get_stock_analyst
+from analysis.valuation_metrics import get_valuation_metrics
+from analysis.industry_comparison import get_industry_comparison
 from analysis.backtest import get_backtest_engine, STRATEGIES
 from analysis.backtest_advanced import get_advanced_backtest_engine
 
@@ -597,6 +600,67 @@ async def get_analysis_report(
         }
     except Exception as e:
         logger.error(f"分析報告失敗: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  估值指標端點
+# ──────────────────────────────────────────────
+@router.get("/valuation/{stock_id}", summary="估值指標分析")
+async def get_valuation(stock_id: str):
+    """取得股票的估值指標 (PE、PB、股利殖利率等)"""
+    try:
+        metrics = get_valuation_metrics()
+        result = metrics.get_valuation(stock_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  產業比較端點
+# ──────────────────────────────────────────────
+@router.get("/industry/industries", summary="產業列表")
+async def get_industries():
+    """取得所有產業列表"""
+    try:
+        comparison = get_industry_comparison()
+        return comparison.get_all_industries()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/industry/compare/{stock_id}", summary="產業比較分析")
+async def get_industry_analysis(stock_id: str):
+    """取得股票的產業比較分析"""
+    try:
+        comparison = get_industry_comparison()
+        return comparison.get_industry_analysis(stock_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/industry/stocks/{industry_name}", summary="產業內股票")
+async def get_industry_stocks(industry_name: str):
+    """取得產業內所有股票"""
+    try:
+        comparison = get_industry_comparison()
+        return comparison.get_industry_stocks(industry_name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  除權息資料端點
+# ──────────────────────────────────────────────
+@router.get("/dividend/{stock_id}", summary="除權息資料")
+async def get_dividend_data(stock_id: str, years: int = Query(5, description="歷史年數")):
+    """取得股票的除權息資料和填息率"""
+    try:
+        fetcher = get_dividend_fetcher()
+        clean_id = stock_id.replace(".TW", "").replace(".TWO", "")
+        return fetcher.get_dividend_data(clean_id, years)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
