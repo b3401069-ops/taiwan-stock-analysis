@@ -22,6 +22,9 @@ from analysis.backtest_advanced import get_advanced_backtest_engine
 from analysis.virtual_portfolio import get_virtual_portfolio
 from analysis.research_report import get_research_report_generator
 from analysis.market_regime import get_market_regime_detector
+from analysis.multi_factor_screener import get_multi_factor_screener
+from analysis.walk_forward import get_walk_forward_validator
+from analysis.factor_attribution import get_factor_attribution
 from services.scheduler import get_scheduler_service
 from agents.stock_chatbot import get_stock_chatbot
 
@@ -992,6 +995,209 @@ async def get_valuation(stock_id: str):
         metrics = get_valuation_metrics()
         result = metrics.get_valuation(stock_id)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  多因子選股端點
+# ──────────────────────────────────────────────
+@router.post("/screener/multi-factor", summary="多因子選股篩選")
+async def multi_factor_screen(
+    universe: List[str] = Query(None, description="股票池（預設使用預設股票池）"),
+    top_n: int = Query(10, description="返回前 N 名")
+):
+    """多因子選股篩選（動量/價值/品質/規模/流動性/法人 6 因子）"""
+    try:
+        screener = get_multi_factor_screener()
+        results = screener.screen(universe, top_n)
+        
+        # 轉換為可序列化的格式
+        results_data = []
+        for score in results:
+            factor_scores_data = []
+            for fs in score.factor_scores:
+                factor_scores_data.append({
+                    "factor_type": fs.factor_type.value,
+                    "score": round(fs.score, 4),
+                    "weight": round(fs.weight, 4),
+                    "details": fs.details
+                })
+            
+            results_data.append({
+                "stock_id": score.stock_id,
+                "stock_name": score.stock_name,
+                "composite_score": round(score.composite_score, 4),
+                "rank": score.rank,
+                "factor_scores": factor_scores_data,
+                "details": score.details
+            })
+        
+        return {
+            "success": True,
+            "data": results_data,
+            "count": len(results_data),
+            "explanation": screener.get_factor_explanation()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/screener/explanation", summary="因子解釋")
+async def get_factor_explanation():
+    """取得多因子選股的因子解釋"""
+    try:
+        screener = get_multi_factor_screener()
+        return {
+            "success": True,
+            "data": screener.get_factor_explanation()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/screener/weights", summary="更新因子權重")
+async def update_factor_weights(weights: dict[str, float]):
+    """更新多因子選股的因子權重"""
+    try:
+        from analysis.multi_factor_screener import FactorType
+        screener = get_multi_factor_screener()
+        
+        # 轉換因子名稱
+        factor_weights = {}
+        for factor_name, weight in weights.items():
+            try:
+                factor_type = FactorType(factor_name)
+                factor_weights[factor_type] = weight
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"無效的因子名稱: {factor_name}")
+        
+        screener.update_weights(factor_weights)
+        
+        return {
+            "success": True,
+            "message": "因子權重更新成功",
+            "new_weights": {k.value: v for k, v in screener.factor_weights.items()}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  Walk-Forward 驗證端點
+# ──────────────────────────────────────────────
+@router.post("/backtest/walk-forward", summary="Walk-Forward 驗證")
+async def walk_forward_validate(
+    stock_id: str = Query(..., description="股票代碼"),
+    strategy_name: str = Query(..., description="策略名稱"),
+    train_window: int = Query(252, description="訓練窗口（交易日）"),
+    test_window: int = Query(63, description="測試窗口（交易日）"),
+    step_size: int = Query(21, description="步進大小（交易日）"),
+    total_years: int = Query(5, description="總回測年數")
+):
+    """Walk-Forward 驗證（滾動窗口訓練/測試，避免過擬合）"""
+    try:
+        from analysis.backtest import STRATEGIES
+        
+        if strategy_name not in STRATEGIES:
+            raise HTTPException(status_code=400, detail=f"無效的策略名稱: {strategy_name}")
+        
+        strategy = STRATEGIES[strategy_name]
+        validator = get_walk_forward_validator()
+        
+        result = validator.validate(
+            stock_id=stock_id,
+            strategy=strategy,
+            train_window=train_window,
+            test_window=test_window,
+            step_size=step_size,
+            total_years=total_years
+        )
+        
+        return {
+            "success": True,
+            "data": validator.to_dict(result)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/backtest/strategies", summary="可用策略列表")
+async def get_available_strategies():
+    """取得所有可用的回測策略"""
+    try:
+        from analysis.backtest import STRATEGIES
+        
+        strategies = {}
+        for name, func in STRATEGIES.items():
+            strategies[name] = {
+                "name": name,
+                "description": func.__doc__.strip() if func.__doc__ else "",
+                "function": func.__name__
+            }
+        
+        return {
+            "success": True,
+            "data": strategies
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  五因子歸因分析端點
+# ──────────────────────────────────────────────
+@router.post("/attribution/stock", summary="股票五因子歸因分析")
+async def stock_factor_attribution(
+    stock_id: str = Query(..., description="股票代碼"),
+    benchmark_id: str = Query("^TWII", description="基準指數代碼"),
+    period: str = Query("2y", description="分析期間")
+):
+    """分析單一股票的五因子歸因（Momentum/Reversal/Quality/Size/Liquidity）"""
+    try:
+        attribution = get_factor_attribution()
+        result = attribution.analyze_stock(stock_id, benchmark_id, period)
+        
+        return {
+            "success": True,
+            "data": attribution.to_dict(result)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/attribution/portfolio", summary="投資組合五因子歸因分析")
+async def portfolio_factor_attribution(
+    stock_ids: List[str] = Query(..., description="股票代碼列表"),
+    weights: List[float] = Query(None, description="權重列表"),
+    period: str = Query("2y", description="分析期間")
+):
+    """分析投資組合的五因子歸因（Momentum/Reversal/Quality/Size/Liquidity）"""
+    try:
+        attribution = get_factor_attribution()
+        result = attribution.analyze_portfolio(stock_ids, weights, period)
+        
+        return {
+            "success": True,
+            "data": attribution.to_dict(result)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/attribution/explanation", summary="五因子解釋")
+async def get_attribution_explanation():
+    """取得五因子歸因分析的因子解釋"""
+    try:
+        attribution = get_factor_attribution()
+        return {
+            "success": True,
+            "data": attribution.get_factor_explanation()
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
