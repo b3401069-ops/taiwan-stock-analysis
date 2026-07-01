@@ -29,6 +29,7 @@ from analysis.industry_rotation import get_industry_rotation_analyzer
 from analysis.concept_rotation import get_concept_rotation_analyzer
 from analysis.ai_stock_summary import get_ai_stock_summary
 from services.scheduler import get_scheduler_service
+from services.notification import get_notification_service
 from agents.stock_chatbot import get_stock_chatbot
 
 # 創建路由器
@@ -1350,6 +1351,141 @@ async def get_ai_analysis_explanation():
         return {
             "success": True,
             "data": summary.get_ai_analysis_explanation()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  通知服務端點
+# ──────────────────────────────────────────────
+@router.post("/notification/discord", summary="發送 Discord 通知")
+async def send_discord_notification(
+    content: str = Query(..., description="訊息內容"),
+    embeds: list[dict] = None
+):
+    """發送 Discord 通知"""
+    try:
+        notification = get_notification_service()
+        success = notification.send_discord_message(content, embeds)
+        
+        return {
+            "success": success,
+            "message": "Discord 通知發送成功" if success else "Discord 通知發送失敗"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/notification/discord/stock-alert", summary="發送 Discord 股票警報")
+async def send_discord_stock_alert(
+    stock_id: str = Query(..., description="股票代碼"),
+    stock_name: str = Query(..., description="股票名稱"),
+    alert_type: str = Query(..., description="警報類型"),
+    message: str = Query(..., description="訊息內容"),
+    price: float = Query(None, description="目前價格"),
+    change_percent: float = Query(None, description="漲跌幅")
+):
+    """發送 Discord 股票警報"""
+    try:
+        notification = get_notification_service()
+        success = notification.send_discord_stock_alert(
+            stock_id, stock_name, alert_type, message, price, change_percent
+        )
+        
+        return {
+            "success": success,
+            "message": "Discord 股票警報發送成功" if success else "Discord 股票警報發送失敗"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/notification/discord/report", summary="發送 Discord 報告")
+async def send_discord_report(
+    report_type: str = Query(..., description="報告類型"),
+    report_data: dict = None
+):
+    """發送 Discord 報告"""
+    try:
+        notification = get_notification_service()
+        success = notification.send_discord_report(report_type, report_data or {})
+        
+        return {
+            "success": success,
+            "message": "Discord 報告發送成功" if success else "Discord 報告發送失敗"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/notification/line", summary="發送 Line 通知")
+async def send_line_notification(message: str = Query(..., description="訊息內容")):
+    """發送 Line 通知"""
+    try:
+        notification = get_notification_service()
+        success = notification.send_line_message(message)
+        
+        return {
+            "success": success,
+            "message": "Line 通知發送成功" if success else "Line 通知發送失敗"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/notification/line/stock-alert", summary="發送 Line 股票警報")
+async def send_line_stock_alert(
+    stock_id: str = Query(..., description="股票代碼"),
+    stock_name: str = Query(..., description="股票名稱"),
+    alert_type: str = Query(..., description="警報類型"),
+    message: str = Query(..., description="訊息內容"),
+    price: float = Query(None, description="目前價格"),
+    change_percent: float = Query(None, description="漲跌幅")
+):
+    """發送 Line 股票警報"""
+    try:
+        notification = get_notification_service()
+        success = notification.send_line_stock_alert(
+            stock_id, stock_name, alert_type, message, price, change_percent
+        )
+        
+        return {
+            "success": success,
+            "message": "Line 股票警報發送成功" if success else "Line 股票警報發送失敗"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/notification/line/report", summary="發送 Line 報告")
+async def send_line_report(
+    report_type: str = Query(..., description="報告類型"),
+    report_data: dict = None
+):
+    """發送 Line 報告"""
+    try:
+        notification = get_notification_service()
+        success = notification.send_line_report(report_type, report_data or {})
+        
+        return {
+            "success": success,
+            "message": "Line 報告發送成功" if success else "Line 報告發送失敗"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/notification/history", summary="取得通知歷史")
+async def get_notification_history(limit: int = Query(50, description="返回筆數")):
+    """取得通知歷史"""
+    try:
+        notification = get_notification_service()
+        history = notification.get_notification_history(limit)
+        
+        return {
+            "success": True,
+            "data": history
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
