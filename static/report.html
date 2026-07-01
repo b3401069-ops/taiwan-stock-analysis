@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票研究報告</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        
+        .report-header {
+            background: linear-gradient(135deg, #673ab7 0%, #9c27b0 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .report-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        
+        .report-card h5 {
+            color: #673ab7;
+            border-bottom: 2px solid #e1bee7;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .stock-report {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border-left: 5px solid #dee2e6;
+        }
+        
+        .stock-report.profit {
+            border-left-color: #dc3545;
+        }
+        
+        .stock-report.loss {
+            border-left-color: #198754;
+        }
+        
+        .stock-report .stock-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .stock-report .stock-id {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .metric-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .metric-item {
+            flex: 1;
+            min-width: 120px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        
+        .metric-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .profit { color: #dc3545; }
+        .loss { color: #198754; }
+        
+        .suggestion-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .suggestion-hold { background-color: #e3f2fd; color: #1565c0; }
+        .suggestion-buy { background-color: #fce4ec; color: #c62828; }
+        .suggestion-sell { background-color: #e8f5e9; color: #2e7d32; }
+        .suggestion-warning { background-color: #fff3e0; color: #e65100; }
+        
+        .report-text {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .btn-generate {
+            background: linear-gradient(135deg, #673ab7 0%, #9c27b0 100%);
+            border: none;
+            padding: 12px 30px;
+            font-weight: 600;
+        }
+        
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(103,58,183,0.4);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 50px;
+        }
+        
+        .report-history-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .report-history-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .report-history-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- 標題 -->
+        <div class="report-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-file-alt me-2"></i>股票研究報告</h2>
+                    <p class="mb-0 opacity-75">每週自動產生持股研究報告，追蹤投資表現</p>
+                </div>
+                <div>
+                    <a href="/portfolio" class="btn btn-outline-light me-2">
+                        <i class="fas fa-wallet me-2"></i>虛擬倉位
+                    </a>
+                    <a href="/app" class="btn btn-outline-light">
+                        <i class="fas fa-chart-line me-2"></i>儀表板
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 報告控制 -->
+        <div class="report-card">
+            <h5><i class="fas fa-cog me-2"></i>報告設定</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">報告類型</label>
+                        <select class="form-select" id="reportType">
+                            <option value="daily">每日報告</option>
+                            <option value="weekly" selected>每週報告</option>
+                            <option value="monthly">每月報告</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">股票代碼（單一股票報告）</label>
+                        <input type="text" class="form-control" id="singleStockId" placeholder="例如：2330.TW">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-generate btn-lg" onclick="generatePortfolioReport()">
+                                <i class="fas fa-chart-bar me-2"></i>產生持股報告
+                            </button>
+                            <button class="btn btn-outline-primary btn-lg" onclick="generateSingleReport()">
+                                <i class="fas fa-search me-2"></i>單一股票報告
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 載入中 -->
+        <div class="loading" id="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">載入中...</span>
+            </div>
+            <p class="mt-3">正在產生報告，請稍候...</p>
+        </div>
+        
+        <!-- 報告結果 -->
+        <div id="reportResult" style="display: none;">
+            <!-- 摘要 -->
+            <div class="report-card">
+                <h5><i class="fas fa-chart-pie me-2"></i>報告摘要</h5>
+                <div class="row" id="summarySection">
+                </div>
+            </div>
+            
+            <!-- 個股報告 -->
+            <div id="stockReportsSection">
+            </div>
+            
+            <!-- 文字報告 -->
+            <div class="report-card">
+                <h5><i class="fas fa-file-alt me-2"></i>完整報告</h5>
+                <div class="report-text" id="reportText">
+                </div>
+            </div>
+        </div>
+        
+        <!-- 報告歷史 -->
+        <div class="report-card">
+            <h5><i class="fas fa-history me-2"></i>報告歷史</h5>
+            <div id="reportHistory">
+                <p class="text-muted">載入中...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/v1';
+        
+        // 載入報告歷史
+        window.onload = function() {
+            loadReportHistory();
+        };
+        
+        async function generatePortfolioReport() {
+            const reportType = document.getElementById('reportType').value;
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('reportResult').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE}/report/portfolio/${reportType}`);
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    displayReport(data.data);
+                } else {
+                    alert('產生報告失敗: ' + (data.error || '未知錯誤'));
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                alert('錯誤: ' + error.message);
+            }
+        }
+        
+        async function generateSingleReport() {
+            const stockId = document.getElementById('singleStockId').value;
+            
+            if (!stockId) {
+                alert('請輸入股票代碼');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('reportResult').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE}/report/stock/${stockId}`);
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    displaySingleReport(data.data);
+                } else {
+                    alert('產生報告失敗: ' + (data.error || '未知錯誤'));
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                alert('錯誤: ' + error.message);
+            }
+        }
+        
+        function displayReport(report) {
+            document.getElementById('reportResult').style.display = 'block';
+            
+            // 摘要
+            const summary = report.summary;
+            const summaryHtml = `
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">持股數量</div>
+                        <div class="metric-value">${summary.total_positions} 檔</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">獲利持股</div>
+                        <div class="metric-value profit">${summary.profitable_positions} 檔</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">虧損持股</div>
+                        <div class="metric-value loss">${summary.losing_positions} 檔</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">平均報酬率</div>
+                        <div class="metric-value ${summary.average_return >= 0 ? 'profit' : 'loss'}">
+                            ${summary.average_return.toFixed(2)}%
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('summarySection').innerHTML = summaryHtml;
+            
+            // 個股報告
+            let stockReportsHtml = '';
+            report.stock_reports.forEach((stock, index) => {
+                if (stock.error) {
+                    stockReportsHtml += `
+                    <div class="stock-report">
+                        <div class="stock-name">${stock.stock_name || 'N/A'}</div>
+                        <div class="text-danger">分析失敗: ${stock.error}</div>
+                    </div>`;
+                    return;
+                }
+                
+                const isProfit = stock.profit_loss >= 0;
+                const statusClass = isProfit ? 'profit' : 'loss';
+                
+                // 建議徽章
+                const suggestion = stock.suggestion || {};
+                const suggestionClass = {
+                    'hold': 'suggestion-hold',
+                    'hold_or_add': 'suggestion-buy',
+                    'reduce': 'suggestion-warning',
+                    'stop_loss': 'suggestion-warning',
+                    'take_profit': 'suggestion-sell',
+                    'consider_sell': 'suggestion-sell'
+                }[suggestion.action] || 'suggestion-hold';
+                
+                const suggestionText = {
+                    'hold': '繼續持有',
+                    'hold_or_add': '持有/加碼',
+                    'reduce': '考慮減碼',
+                    'stop_loss': '執行停損',
+                    'take_profit': '獲利了結',
+                    'consider_sell': '考慮賣出'
+                }[suggestion.action] || '持有觀察';
+                
+                stockReportsHtml += `
+                <div class="stock-report ${statusClass}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stock-name">${stock.stock_name}</div>
+                            <div class="stock-id">${stock.stock_id} • ${stock.shares} 股 • 進場 ${stock.entry_date}</div>
+                        </div>
+                        <div class="text-end">
+                            <span class="suggestion-badge ${suggestionClass}">${suggestionText}</span>
+                            <div class="small text-muted mt-1">信心 ${suggestion.confidence || 0}%</div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-row">
+                        <div class="metric-item">
+                            <div class="metric-label">進場價</div>
+                            <div class="metric-value">${stock.entry_price.toFixed(1)}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">目前價</div>
+                            <div class="metric-value">${stock.current_price.toFixed(1)}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">損益</div>
+                            <div class="metric-value ${isProfit ? 'profit' : 'loss'}">
+                                ${stock.profit_loss_pct.toFixed(2)}%
+                            </div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">目標價</div>
+                            <div class="metric-value">${stock.target_price.toFixed(1)}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">停損價</div>
+                            <div class="metric-value">${stock.stop_loss.toFixed(1)}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <strong>建議原因：</strong>${suggestion.reason || 'N/A'}
+                    </div>
+                </div>`;
+            });
+            
+            document.getElementById('stockReportsSection').innerHTML = stockReportsHtml;
+            
+            // 文字報告
+            document.getElementById('reportText').textContent = report.report_text || '無文字報告';
+        }
+        
+        function displaySingleReport(report) {
+            document.getElementById('reportResult').style.display = 'block';
+            
+            // 摘要
+            const priceInfo = report.price_info || {};
+            const recommendation = report.recommendation || {};
+            
+            const summaryHtml = `
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">目前股價</div>
+                        <div class="metric-value">${priceInfo.current_price || 'N/A'}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">漲跌</div>
+                        <div class="metric-value ${(priceInfo.change || 0) >= 0 ? 'profit' : 'loss'}">
+                            ${priceInfo.change || 0} (${priceInfo.change_percent || 0}%)
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">建議動作</div>
+                        <div class="metric-value">${recommendation.action || 'N/A'}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-item">
+                        <div class="metric-label">信心水平</div>
+                        <div class="metric-value">${recommendation.confidence || 0}%</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('summarySection').innerHTML = summaryHtml;
+            
+            // 單一股票報告
+            const stockHtml = `
+            <div class="stock-report">
+                <div class="stock-name">${report.stock_name || report.stock_id}</div>
+                <div class="stock-id">${report.stock_id}</div>
+                
+                <div class="metric-row">
+                    <div class="metric-item">
+                        <div class="metric-label">目標價</div>
+                        <div class="metric-value">${recommendation.target_price || 'N/A'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">停損價</div>
+                        <div class="metric-value">${recommendation.stop_loss || 'N/A'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">趨勢評分</div>
+                        <div class="metric-value">${(report.trend_analysis || {}).score || 0}/100</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">風險等級</div>
+                        <div class="metric-value">${(report.risk_assessment || {}).level || 'N/A'}</div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <strong>AI 分析摘要：</strong>
+                    <div class="mt-2">${report.summary || '無摘要'}</div>
+                </div>
+            </div>`;
+            
+            document.getElementById('stockReportsSection').innerHTML = stockHtml;
+            
+            // 文字報告
+            document.getElementById('reportText').textContent = report.summary || '無詳細報告';
+        }
+        
+        async function loadReportHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/report/history`);
+                const data = await response.json();
+                
+                const container = document.getElementById('reportHistory');
+                
+                if (data.success && data.data.length > 0) {
+                    let html = '';
+                    data.data.forEach(report => {
+                        html += `
+                        <div class="report-history-item">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <i class="fas fa-file-alt me-2"></i>
+                                    <strong>${report.filename}</strong>
+                                </div>
+                                <div class="text-muted small">${new Date(report.modified).toLocaleString()}</div>
+                            </div>
+                        </div>`;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p class="text-muted">尚無報告歷史</p>';
+                }
+            } catch (error) {
+                console.error('載入報告歷史失敗:', error);
+            }
+        }
+    </script>
+</body>
+</html>

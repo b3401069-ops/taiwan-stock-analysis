@@ -18,6 +18,7 @@ from analysis.industry_comparison import get_industry_comparison
 from analysis.backtest import get_backtest_engine, STRATEGIES
 from analysis.backtest_advanced import get_advanced_backtest_engine
 from analysis.virtual_portfolio import get_virtual_portfolio
+from analysis.research_report import get_research_report_generator
 from agents.stock_chatbot import get_stock_chatbot
 
 # 創建路由器
@@ -818,6 +819,53 @@ async def ai_suggest_buy(
         
     except Exception as e:
         logger.error(f"AI 建議買入失敗: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  研究報告端點
+# ──────────────────────────────────────────────
+@router.get("/report/portfolio/{report_type}", summary="持股研究報告")
+async def get_portfolio_report(report_type: str = "weekly"):
+    """
+    產生持股研究報告
+    
+    report_type: daily/weekly/monthly
+    """
+    try:
+        generator = get_research_report_generator()
+        return generator.generate_portfolio_report(report_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/report/stock/{stock_id}", summary="單一股票研究報告")
+async def get_stock_report(stock_id: str):
+    """產生單一股票研究報告"""
+    try:
+        generator = get_research_report_generator()
+        return generator.generate_single_stock_report(stock_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/report/history", summary="報告歷史")
+async def get_report_history(limit: int = Query(10, description="筆數")):
+    """取得報告歷史記錄"""
+    try:
+        generator = get_research_report_generator()
+        return generator.get_report_history(limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/report/generate", summary="產生報告")
+async def generate_report(report_type: str = Query("weekly", description="報告類型")):
+    """手動產生報告"""
+    try:
+        generator = get_research_report_generator()
+        return generator.generate_portfolio_report(report_type)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
