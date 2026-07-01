@@ -241,6 +241,78 @@ def create_app() -> FastAPI:
             with open(advanced_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>進階分析頁面不存在</h1>")
+    
+    # Streamlit 儀表板嵌入頁面
+    @app.get("/dashboard", response_class=HTMLResponse)
+    async def dashboard_page():
+        """Streamlit 儀表板嵌入頁面"""
+        html_content = """
+        <!DOCTYPE html>
+        <html lang="zh-TW">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>台灣股票分析工具 - Streamlit 儀表板</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+            <style>
+                body {
+                    background-color: #f8f9fa;
+                    padding: 20px;
+                }
+                .dashboard-header {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border-radius: 15px;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                }
+                .streamlit-container {
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+                    overflow: hidden;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container-fluid">
+                <div class="dashboard-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2><i class="fas fa-chart-line me-2"></i>Streamlit 儀表板</h2>
+                            <p class="mb-0 opacity-75">專業的前端儀表板，整合所有分析功能</p>
+                        </div>
+                        <div>
+                            <a href="/app" class="btn btn-outline-light me-2">
+                                <i class="fas fa-arrow-left me-2"></i>返回主介面
+                            </a>
+                            <a href="/docs" class="btn btn-outline-light">
+                                <i class="fas fa-book me-2"></i>API 文件
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="streamlit-container">
+                    <iframe 
+                        src="http://localhost:8501" 
+                        width="100%" 
+                        height="800px" 
+                        frameborder="0"
+                        style="border: none;"
+                    ></iframe>
+                </div>
+                
+                <div class="mt-3 text-center text-muted">
+                    <p><i class="fas fa-info-circle me-2"></i>Streamlit 儀表板運行在端口 8501</p>
+                    <p>如果無法載入，請先執行: <code>streamlit run streamlit_app.py --server.port 8501</code></p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
 
     # 添加根端點
     @app.get("/")
@@ -258,6 +330,7 @@ def create_app() -> FastAPI:
             "scheduler": "/scheduler",
             "screener": "/screener",
             "advanced": "/advanced",
+            "dashboard": "/dashboard",
             "api": "/api/v1"
         }
     
