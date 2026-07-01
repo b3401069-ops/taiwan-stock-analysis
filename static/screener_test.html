@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多因子選股測試</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        
+        .screener-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .screener-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        
+        .screener-card h5 {
+            color: #667eea;
+            border-bottom: 2px solid #e8e8ff;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .factor-item {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .factor-item:hover {
+            background-color: #f8f9ff;
+        }
+        
+        .factor-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .factor-description {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .factor-weight {
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .stock-item {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background-color: white;
+        }
+        
+        .stock-item:hover {
+            background-color: #f8f9ff;
+            border-color: #667eea;
+        }
+        
+        .stock-rank {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .stock-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .stock-id {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .stock-score {
+            font-weight: 700;
+            color: #28a745;
+            font-size: 18px;
+        }
+        
+        .stock-price {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .factor-score {
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .score-positive {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .score-negative {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .score-neutral {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .btn-screen {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .btn-screen:hover {
+            background: linear-gradient(135deg, #5a6fd6 0%, #6a4294 100%);
+            color: white;
+        }
+        
+        .weight-slider {
+            width: 100%;
+        }
+        
+        .explanation-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f8f9ff;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- 標題 -->
+        <div class="screener-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-search me-2"></i>多因子選股引擎</h2>
+                    <p class="mb-0 opacity-75">動量/價值/品質/規模/流動性/法人 6 因子篩選</p>
+                </div>
+                <div>
+                    <a href="/test" class="btn btn-outline-light me-2">
+                        <i class="fas fa-arrow-left me-2"></i>返回測試頁面
+                    </a>
+                    <a href="/app" class="btn btn-outline-light">
+                        <i class="fas fa-chart-line me-2"></i>儀表板
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 因子解釋 -->
+        <div class="screener-card">
+            <h5><i class="fas fa-info-circle me-2"></i>因子解釋</h5>
+            <div id="factorExplanation">
+                <p class="text-muted">載入中...</p>
+            </div>
+        </div>
+        
+        <!-- 因子權重調整 -->
+        <div class="screener-card">
+            <h5><i class="fas fa-sliders-h me-2"></i>因子權重調整</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">動量因子 (Momentum)</label>
+                        <input type="range" class="form-range weight-slider" id="weight-momentum" min="0" max="100" value="20">
+                        <div class="text-muted">目前權重: <span id="weight-momentum-value">20%</span></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">價值因子 (Value)</label>
+                        <input type="range" class="form-range weight-slider" id="weight-value" min="0" max="100" value="25">
+                        <div class="text-muted">目前權重: <span id="weight-value-value">25%</span></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">品質因子 (Quality)</label>
+                        <input type="range" class="form-range weight-slider" id="weight-quality" min="0" max="100" value="25">
+                        <div class="text-muted">目前權重: <span id="weight-quality-value">25%</span></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">規模因子 (Size)</label>
+                        <input type="range" class="form-range weight-slider" id="weight-size" min="0" max="100" value="10">
+                        <div class="text-muted">目前權重: <span id="weight-size-value">10%</span></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">流動性因子 (Liquidity)</label>
+                        <input type="range" class="form-range weight-slider" id="weight-liquidity" min="0" max="100" value="10">
+                        <div class="text-muted">目前權重: <span id="weight-liquidity-value">10%</span></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">法人因子 (Institutional)</label>
+                        <input type="range" class="form-range weight-slider" id="weight-institutional" min="0" max="100" value="10">
+                        <div class="text-muted">目前權重: <span id="weight-institutional-value">10%</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center mt-3">
+                <button class="btn btn-screen btn-lg" onclick="updateWeights()">
+                    <i class="fas fa-save me-2"></i>更新權重
+                </button>
+            </div>
+        </div>
+        
+        <!-- 選股篩選 -->
+        <div class="screener-card">
+            <h5><i class="fas fa-filter me-2"></i>選股篩選</h5>
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <label class="form-label">股票池（可選，預設使用預設股票池）</label>
+                        <input type="text" class="form-control" id="stockUniverse" 
+                               placeholder="輸入股票代碼，以逗號分隔 (例如: 2330.TW,2317.TW,2454.TW)">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">返回前 N 名</label>
+                        <input type="number" class="form-control" id="topN" value="10" min="1" max="50">
+                    </div>
+                </div>
+            </div>
+            <div class="text-center">
+                <button class="btn btn-screen btn-lg" onclick="runScreening()">
+                    <i class="fas fa-search me-2"></i>開始篩選
+                </button>
+            </div>
+        </div>
+        
+        <!-- 篩選結果 -->
+        <div class="screener-card">
+            <h5><i class="fas fa-list me-2"></i>篩選結果</h5>
+            <div id="screeningResults">
+                <p class="text-muted">尚未執行篩選</p>
+            </div>
+        </div>
+        
+        <!-- 篩選說明 -->
+        <div class="screener-card">
+            <h5><i class="fas fa-question-circle me-2"></i>篩選說明</h5>
+            <div class="explanation-item">
+                <h6>多因子選股原理</h6>
+                <p>多因子選股是量化投資的核心技術，通過結合多個因子來選出表現優異的股票。每個因子代表一種投資邏輯，綜合多個因子可以降低單一因子的風險。</p>
+            </div>
+            <div class="explanation-item">
+                <h6>因子權重調整</h6>
+                <p>您可以根據自己的投資風格調整各因子的權重。例如，如果您偏好價值投資，可以增加價值因子的權重；如果您偏好動量投資，可以增加動量因子的權重。</p>
+            </div>
+            <div class="explanation-item">
+                <h6>使用建議</h6>
+                <ul>
+                    <li>建議定期調整權重以適應市場變化</li>
+                    <li>可根據產業特性調整因子權重</li>
+                    <li>建議結合其他分析方法使用</li>
+                    <li>注意因子之間的相關性</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/v1';
+        
+        // 載入因子解釋
+        window.onload = function() {
+            loadFactorExplanation();
+            setupWeightSliders();
+        };
+        
+        async function loadFactorExplanation() {
+            try {
+                const response = await fetch(`${API_BASE}/screener/explanation`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateFactorExplanation(data.data);
+                }
+            } catch (error) {
+                console.error('載入因子解釋失敗:', error);
+            }
+        }
+        
+        function updateFactorExplanation(explanation) {
+            const container = document.getElementById('factorExplanation');
+            let html = '';
+            
+            for (const [factorName, factorInfo] of Object.entries(explanation)) {
+                html += `
+                <div class="factor-item">
+                    <div>
+                        <div class="factor-name">${factorInfo.name}</div>
+                        <div class="factor-description">${factorInfo.description}</div>
+                        <div class="text-muted small">指標: ${factorInfo.metrics.join(', ')}</div>
+                    </div>
+                    <div class="factor-weight">${(factorInfo.weight * 100).toFixed(1)}%</div>
+                </div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        function setupWeightSliders() {
+            const factors = ['momentum', 'value', 'quality', 'size', 'liquidity', 'institutional'];
+            
+            factors.forEach(factor => {
+                const slider = document.getElementById(`weight-${factor}`);
+                const valueDisplay = document.getElementById(`weight-${factor}-value`);
+                
+                if (slider && valueDisplay) {
+                    slider.addEventListener('input', function() {
+                        valueDisplay.textContent = this.value + '%';
+                    });
+                }
+            });
+        }
+        
+        async function updateWeights() {
+            const factors = ['momentum', 'value', 'quality', 'size', 'liquidity', 'institutional'];
+            const weights = {};
+            
+            factors.forEach(factor => {
+                const slider = document.getElementById(`weight-${factor}`);
+                if (slider) {
+                    weights[factor] = parseInt(slider.value) / 100;
+                }
+            });
+            
+            try {
+                const response = await fetch(`${API_BASE}/screener/weights`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(weights)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ 因子權重更新成功！');
+                    loadFactorExplanation(); // 重新載入因子解釋
+                } else {
+                    alert('❌ 更新失敗: ' + (data.error || '未知錯誤'));
+                }
+            } catch (error) {
+                alert('錯誤: ' + error.message);
+            }
+        }
+        
+        async function runScreening() {
+            const universeInput = document.getElementById('stockUniverse').value;
+            const topN = parseInt(document.getElementById('topN').value);
+            
+            let universe = null;
+            if (universeInput.trim()) {
+                universe = universeInput.split(',').map(s => s.trim()).filter(s => s);
+            }
+            
+            try {
+                document.getElementById('screeningResults').innerHTML = '<p class="text-muted">篩選中，請稍候...</p>';
+                
+                const params = new URLSearchParams();
+                if (universe) {
+                    universe.forEach(stock => params.append('universe', stock));
+                }
+                params.append('top_n', topN);
+                
+                const response = await fetch(`${API_BASE}/screener/multi-factor?${params}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateScreeningResults(data.data, data.count);
+                } else {
+                    document.getElementById('screeningResults').innerHTML = 
+                        `<p class="text-danger">篩選失敗: ${data.error || '未知錯誤'}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('screeningResults').innerHTML = 
+                    `<p class="text-danger">錯誤: ${error.message}</p>`;
+            }
+        }
+        
+        function updateScreeningResults(results, count) {
+            const container = document.getElementById('screeningResults');
+            
+            if (!results || results.length === 0) {
+                container.innerHTML = '<p class="text-muted">沒有篩選結果</p>';
+                return;
+            }
+            
+            let html = `<p class="mb-3">共篩選出 ${count} 檔股票</p>`;
+            
+            results.forEach(stock => {
+                html += `
+                <div class="stock-item">
+                    <div class="row align-items-center">
+                        <div class="col-md-1 text-center">
+                            <div class="stock-rank">${stock.rank}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stock-name">${stock.stock_name}</div>
+                            <div class="stock-id">${stock.stock_id}</div>
+                        </div>
+                        <div class="col-md-2 text-center">
+                            <div class="stock-score">${stock.composite_score.toFixed(4)}</div>
+                            <div class="text-muted small">綜合分數</div>
+                        </div>
+                        <div class="col-md-2 text-center">
+                            <div class="stock-price">${stock.details.current_price?.toFixed(2) || 'N/A'}</div>
+                            <div class="text-muted small">目前價格</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex flex-wrap gap-1">
+                                ${stock.factor_scores.map(fs => {
+                                    let scoreClass = 'score-neutral';
+                                    if (fs.score > 0.1) scoreClass = 'score-positive';
+                                    else if (fs.score < -0.1) scoreClass = 'score-negative';
+                                    
+                                    return `<span class="factor-score ${scoreClass}">${fs.factor_type}: ${fs.score.toFixed(2)}</span>`;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
