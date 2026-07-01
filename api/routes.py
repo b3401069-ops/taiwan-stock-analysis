@@ -25,6 +25,9 @@ from analysis.market_regime import get_market_regime_detector
 from analysis.multi_factor_screener import get_multi_factor_screener
 from analysis.walk_forward import get_walk_forward_validator
 from analysis.factor_attribution import get_factor_attribution
+from analysis.industry_rotation import get_industry_rotation_analyzer
+from analysis.concept_rotation import get_concept_rotation_analyzer
+from analysis.ai_stock_summary import get_ai_stock_summary
 from services.scheduler import get_scheduler_service
 from agents.stock_chatbot import get_stock_chatbot
 
@@ -1197,6 +1200,156 @@ async def get_attribution_explanation():
         return {
             "success": True,
             "data": attribution.get_factor_explanation()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  產業輪動分析端點
+# ──────────────────────────────────────────────
+@router.get("/industry/rotation", summary="產業輪動分析")
+async def get_industry_rotation(period: str = Query("6mo", description="分析期間")):
+    """產業輪動分析（追蹤產業強度變化、識別輪動機會）"""
+    try:
+        analyzer = get_industry_rotation_analyzer()
+        return analyzer.get_rotation_analysis(period)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/industry/ranking", summary="產業排名")
+async def get_industry_ranking(period: str = Query("6mo", description="分析期間")):
+    """取得產業強度排名"""
+    try:
+        analyzer = get_industry_rotation_analyzer()
+        ranking = analyzer.get_industry_ranking(period)
+        return {
+            "success": True,
+            "data": ranking
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/industry/explanation", summary="產業輪動解釋")
+async def get_industry_rotation_explanation():
+    """取得產業輪動分析解釋"""
+    try:
+        analyzer = get_industry_rotation_analyzer()
+        return {
+            "success": True,
+            "data": analyzer.get_industry_explanation()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  概念股輪動分析端點
+# ──────────────────────────────────────────────
+@router.get("/concept/rotation", summary="概念股輪動分析")
+async def get_concept_rotation(period: str = Query("6mo", description="分析期間")):
+    """概念股輪動分析（追蹤熱門概念股輪動）"""
+    try:
+        analyzer = get_concept_rotation_analyzer()
+        return analyzer.get_concept_analysis(period)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/concept/ranking", summary="概念股排名")
+async def get_concept_ranking(period: str = Query("6mo", description="分析期間")):
+    """取得概念股熱度排名"""
+    try:
+        analyzer = get_concept_rotation_analyzer()
+        ranking = analyzer.get_concept_ranking(period)
+        return {
+            "success": True,
+            "data": ranking
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/concept/hot", summary="熱門概念股")
+async def get_hot_concepts(
+    period: str = Query("6mo", description="分析期間"),
+    min_heat: float = Query(0.5, description="最低熱度分數")
+):
+    """取得熱門概念股"""
+    try:
+        analyzer = get_concept_rotation_analyzer()
+        hot_concepts = analyzer.find_hot_concepts(period, min_heat)
+        
+        # 轉換為可序列化格式
+        hot_concepts_data = []
+        for concept in hot_concepts:
+            stocks_data = []
+            for stock in concept.stocks:
+                stocks_data.append({
+                    "stock_id": stock.stock_id,
+                    "stock_name": stock.stock_name,
+                    "correlation": round(stock.correlation, 4),
+                    "momentum_20d": f"{stock.momentum_20d:.2%}",
+                    "trend": stock.trend.value
+                })
+            
+            hot_concepts_data.append({
+                "concept": concept.concept_name,
+                "description": concept.description,
+                "heat_score": round(concept.heat_score, 4),
+                "trend": concept.trend.value,
+                "stocks": stocks_data
+            })
+        
+        return {
+            "success": True,
+            "data": hot_concepts_data,
+            "count": len(hot_concepts_data)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/concept/explanation", summary="概念股輪動解釋")
+async def get_concept_rotation_explanation():
+    """取得概念股輪動分析解釋"""
+    try:
+        analyzer = get_concept_rotation_analyzer()
+        return {
+            "success": True,
+            "data": analyzer.get_concept_explanation()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  AI 選股摘要端點
+# ──────────────────────────────────────────────
+@router.post("/ai/summary", summary="AI 選股摘要")
+async def ai_stock_summary_endpoint(
+    universe: List[str] = Query(None, description="股票池"),
+    top_n: int = Query(10, description="返回前 N 名"),
+    include_analysis: bool = Query(True, description="是否包含詳細分析")
+):
+    """AI 選股摘要（結合多因子選股、市場狀態、產業輪動、概念股輪動）"""
+    try:
+        summary = get_ai_stock_summary()
+        return summary.generate_summary(universe, top_n, include_analysis)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ai/explanation", summary="AI 分析解釋")
+async def get_ai_analysis_explanation():
+    """取得 AI 選股摘要分析解釋"""
+    try:
+        summary = get_ai_stock_summary()
+        return {
+            "success": True,
+            "data": summary.get_ai_analysis_explanation()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
