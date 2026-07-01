@@ -49,7 +49,11 @@ async def lifespan(app: FastAPI):
     # 初始化資料庫連接
     # 初始化快取連接
     # 初始化券商API連接
-    # 啟動資料更新排程器
+    
+    # 啟動排程服務
+    from services.scheduler import get_scheduler_service
+    scheduler = get_scheduler_service()
+    scheduler.start()
     
     logger.info("台灣股票分析工具啟動完成")
     
@@ -58,9 +62,11 @@ async def lifespan(app: FastAPI):
     # 關閉時執行
     logger.info("正在關閉台灣股票分析工具...")
     
+    # 停止排程服務
+    scheduler.stop()
+    
     # 關閉資料庫連接
     # 關閉快取連接
-    # 停止資料更新排程器
     
     logger.info("台灣股票分析工具已關閉")
 
@@ -205,6 +211,16 @@ def create_app() -> FastAPI:
             with open(report_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>報告頁面不存在</h1>")
+    
+    # 添加排程頁面
+    @app.get("/scheduler", response_class=HTMLResponse)
+    async def scheduler_page():
+        """排程管理頁面"""
+        scheduler_path = os.path.join(os.path.dirname(__file__), "static", "scheduler.html")
+        if os.path.exists(scheduler_path):
+            with open(scheduler_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+        return HTMLResponse(content="<h1>排程頁面不存在</h1>")
 
     # 添加根端點
     @app.get("/")
@@ -219,6 +235,7 @@ def create_app() -> FastAPI:
             "test": "/test",
             "portfolio": "/portfolio",
             "report": "/report",
+            "scheduler": "/scheduler",
             "api": "/api/v1"
         }
     

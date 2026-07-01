@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from datetime import datetime, date
 import pandas as pd
+import schedule
 
 # 導入服務
 from api.services import StockService, AnalysisService, RecommendationService
@@ -19,6 +20,7 @@ from analysis.backtest import get_backtest_engine, STRATEGIES
 from analysis.backtest_advanced import get_advanced_backtest_engine
 from analysis.virtual_portfolio import get_virtual_portfolio
 from analysis.research_report import get_research_report_generator
+from services.scheduler import get_scheduler_service
 from agents.stock_chatbot import get_stock_chatbot
 
 # 創建路由器
@@ -865,6 +867,48 @@ async def generate_report(report_type: str = Query("weekly", description="報告
     try:
         generator = get_research_report_generator()
         return generator.generate_portfolio_report(report_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  排程服務端點
+# ──────────────────────────────────────────────
+@router.get("/scheduler/jobs", summary="排程任務列表")
+async def get_scheduled_jobs():
+    """取得所有排程任務"""
+    try:
+        scheduler = get_scheduler_service()
+        jobs = scheduler.get_scheduled_jobs()
+        return {"success": True, "data": jobs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/scheduler/run/{job_name}", summary="立即執行任務")
+async def run_job_now(job_name: str):
+    """立即執行指定任務"""
+    try:
+        scheduler = get_scheduler_service()
+        result = scheduler.run_job_now(job_name)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/scheduler/status", summary="排程服務狀態")
+async def get_scheduler_status():
+    """取得排程服務狀態"""
+    try:
+        scheduler = get_scheduler_service()
+        return {
+            "success": True,
+            "data": {
+                "is_running": scheduler.is_running,
+                "jobs_count": len(schedule.get_jobs()),
+                "jobs": scheduler.get_scheduled_jobs()
+            }
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
