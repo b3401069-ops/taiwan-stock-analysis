@@ -165,6 +165,26 @@ def create_app() -> FastAPI:
             with open(index_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>前端文件不存在</h1>")
+    
+    # 添加聊天頁面
+    @app.get("/chat", response_class=HTMLResponse)
+    async def chat_page():
+        """AI 聊天分析師頁面"""
+        chat_path = os.path.join(os.path.dirname(__file__), "static", "chat.html")
+        if os.path.exists(chat_path):
+            with open(chat_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+        return HTMLResponse(content="<h1>聊天頁面不存在</h1>")
+    
+    # 添加測試頁面
+    @app.get("/test", response_class=HTMLResponse)
+    async def test_page():
+        """API 測試頁面"""
+        test_path = os.path.join(os.path.dirname(__file__), "static", "test.html")
+        if os.path.exists(test_path):
+            with open(test_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+        return HTMLResponse(content="<h1>測試頁面不存在</h1>")
 
     # 添加根端點
     @app.get("/")
@@ -174,7 +194,10 @@ def create_app() -> FastAPI:
             "message": "歡迎使用台灣股票分析工具",
             "docs": "/docs",
             "health": "/health",
-            "app": "/app"
+            "app": "/app",
+            "chat": "/chat",
+            "test": "/test",
+            "api": "/api/v1"
         }
     
     return app
@@ -191,11 +214,33 @@ if __name__ == "__main__":
     # 獲取配置
     settings = get_settings()
     
+    # 設定端口（避免常用端口衝突）
+    port = 9999
+    
+    # 自動開啟瀏覽器
+    import webbrowser
+    import threading
+    
+    def open_browser():
+        """延遲開啟瀏覽器"""
+        import time
+        time.sleep(2)  # 等待伺服器啟動
+        webbrowser.open(f"http://localhost:{port}/app")
+        logger.info(f"已開啟瀏覽器: http://localhost:{port}/app")
+    
+    # 在背景執行緒開啟瀏覽器
+    if not settings.DEBUG:  # 非 debug 模式才自動開啟
+        threading.Thread(target=open_browser, daemon=True).start()
+    
+    logger.info(f"啟動台灣股票分析工具...")
+    logger.info(f"API 文件: http://localhost:{port}/docs")
+    logger.info(f"前端頁面: http://localhost:{port}/app")
+    
     # 啟動應用
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8080,
+        port=port,
         reload=settings.DEBUG,
         log_level=settings.LOG_LEVEL.lower()
     )

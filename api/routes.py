@@ -17,6 +17,7 @@ from analysis.valuation_metrics import get_valuation_metrics
 from analysis.industry_comparison import get_industry_comparison
 from analysis.backtest import get_backtest_engine, STRATEGIES
 from analysis.backtest_advanced import get_advanced_backtest_engine
+from agents.stock_chatbot import get_stock_chatbot
 
 # 創建路由器
 router = APIRouter()
@@ -600,6 +601,45 @@ async def get_analysis_report(
         }
     except Exception as e:
         logger.error(f"分析報告失敗: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  AI 聊天分析師端點
+# ──────────────────────────────────────────────
+@router.post("/chat", summary="AI 聊天分析師")
+async def chat_with_analyst(
+    message: str = Query(..., description="用戶訊息")
+):
+    """與 AI 股票分析師對話"""
+    try:
+        chatbot = get_stock_chatbot()
+        result = await chatbot.chat(message)
+        return result
+    except Exception as e:
+        logger.error(f"聊天失敗: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/chat/history", summary="取得對話歷史")
+async def get_chat_history():
+    """取得對話歷史記錄"""
+    try:
+        chatbot = get_stock_chatbot()
+        history = chatbot.get_conversation_history()
+        return {"success": True, "data": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/chat/history", summary="清除對話歷史")
+async def clear_chat_history():
+    """清除對話歷史記錄"""
+    try:
+        chatbot = get_stock_chatbot()
+        chatbot.clear_history()
+        return {"success": True, "message": "對話歷史已清除"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
