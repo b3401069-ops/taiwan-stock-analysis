@@ -17,6 +17,7 @@ from analysis.valuation_metrics import get_valuation_metrics
 from analysis.industry_comparison import get_industry_comparison
 from analysis.backtest import get_backtest_engine, STRATEGIES
 from analysis.backtest_advanced import get_advanced_backtest_engine
+from analysis.virtual_portfolio import get_virtual_portfolio
 from agents.stock_chatbot import get_stock_chatbot
 
 # 創建路由器
@@ -640,6 +641,183 @@ async def clear_chat_history():
         chatbot.clear_history()
         return {"success": True, "message": "對話歷史已清除"}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  虛擬倉位端點
+# ──────────────────────────────────────────────
+@router.get("/portfolio/summary", summary="倉位摘要")
+async def get_portfolio_summary():
+    """取得虛擬倉位摘要"""
+    try:
+        portfolio = get_virtual_portfolio()
+        return portfolio.get_portfolio_summary()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/portfolio/buy", summary="買入股票")
+async def buy_stock(
+    stock_id: str = Query(..., description="股票代碼"),
+    stock_name: str = Query(..., description="股票名稱"),
+    shares: int = Query(..., description="股數"),
+    entry_price: float = Query(..., description="進場價格"),
+    entry_reason: str = Query("AI 建議", description="進場原因"),
+    ai_confidence: int = Query(70, description="AI 信心水平"),
+    target_price: float = Query(0, description="目標價"),
+    stop_loss: float = Query(0, description="停損價")
+):
+    """買入股票到虛擬倉位"""
+    try:
+        portfolio = get_virtual_portfolio()
+        
+        # 如果沒有目標價，預設 +10%
+        if target_price == 0:
+            target_price = entry_price * 1.1
+        
+        # 如果沒有停損，預設 -5%
+        if stop_loss == 0:
+            stop_loss = entry_price * 0.95
+        
+        result = portfolio.add_position(
+            stock_id=stock_id,
+            stock_name=stock_name,
+            shares=shares,
+            entry_price=entry_price,
+            entry_reason=entry_reason,
+            ai_confidence=ai_confidence,
+            target_price=target_price,
+            stop_loss=stop_loss
+        )
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/portfolio/sell", summary="賣出股票")
+async def sell_stock(
+    stock_id: str = Query(..., description="股票代碼"),
+    shares: int = Query(..., description="賣出股數"),
+    sell_price: float = Query(..., description="賣出價格"),
+    reason: str = Query("手動賣出", description="賣出原因")
+):
+    """賣出虛擬倉位股票"""
+    try:
+        portfolio = get_virtual_portfolio()
+        result = portfolio.sell_position(
+            stock_id=stock_id,
+            shares=shares,
+            sell_price=sell_price,
+            reason=reason
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/portfolio/history", summary="交易歷史")
+async def get_trade_history(limit: int = Query(50, description="筆數")):
+    """取得交易歷史"""
+    try:
+        portfolio = get_virtual_portfolio()
+        return portfolio.get_trade_history(limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/portfolio/alerts", summary="停損停利警報")
+async def get_portfolio_alerts():
+    """檢查停損和目標價警報"""
+    try:
+        portfolio = get_virtual_portfolio()
+        alerts = portfolio.check_stop_loss_and_target()
+        return {"success": True, "data": alerts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/portfolio/review", summary="投資回顧報告")
+async def get_investment_review():
+    """生成投資回顧報告"""
+    try:
+        portfolio = get_virtual_portfolio()
+        return portfolio.generate_investment_review()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/portfolio/reset", summary="重置倉位")
+async def reset_portfolio():
+    """重置虛擬倉位"""
+    try:
+        portfolio = get_virtual_portfolio()
+        return portfolio.reset_portfolio()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/portfolio/ai-buy", summary="AI 建議買入")
+async def ai_suggest_buy(
+    stock_id: str = Query(..., description="股票代碼"),
+    amount: float = Query(100000, description="投資金額")
+):
+    """AI 分析後建議買入"""
+    try:
+        # 取得 AI 分析
+        analyst = get_stock_analyst()
+        analysis = await analyst.analyze(stock_id, include_ml=True)
+        
+        if not analysis.get("success"):
+            return {"success": False, "error": "AI 分析失敗"}
+        
+        data = analysis["data"]
+        rec = data.get("recommendation", {})
+        
+        # 檢查是否建議買入
+        if rec.get("action") != "buy":
+            return {
+                "success": False,
+                "message": f"AI 不建議買入。建議動作：{rec.get('action', 'hold')}",
+                "data": rec
+            }
+        
+        # 計算股數
+        current_price = data.get("price_info", {}).get("current_price", 0)
+        if current_price <= 0:
+            return {"success": False, "error": "無法取得目前股價"}
+        
+        shares = int(amount / current_price / 1000) * 1000  # 整張
+        if shares == 0:
+            shares = 100  # 至少 100 股（零股）
+        
+        # 買入
+        portfolio = get_virtual_portfolio()
+        result = portfolio.add_position(
+            stock_id=stock_id,
+            stock_name=data.get("stock_name", stock_id),
+            shares=shares,
+            entry_price=current_price,
+            entry_reason=f"AI 建議買入。{rec.get('reason', '')}",
+            ai_confidence=rec.get("confidence", 70),
+            target_price=rec.get("target_price", current_price * 1.1),
+            stop_loss=rec.get("stop_loss", current_price * 0.95)
+        )
+        
+        # 加入 AI 分析摘要
+        if result.get("success"):
+            result["ai_analysis"] = {
+                "action": rec.get("action"),
+                "confidence": rec.get("confidence"),
+                "target_price": rec.get("target_price"),
+                "stop_loss": rec.get("stop_loss")
+            }
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"AI 建議買入失敗: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

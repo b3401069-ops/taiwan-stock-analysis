@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虛擬倉位管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        
+        .portfolio-header {
+            background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        
+        .summary-card h6 {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        
+        .summary-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        
+        .profit { color: #dc3545; }
+        .loss { color: #198754; }
+        
+        .position-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border-left: 5px solid #dee2e6;
+        }
+        
+        .position-card.profit {
+            border-left-color: #dc3545;
+        }
+        
+        .position-card.loss {
+            border-left-color: #198754;
+        }
+        
+        .position-card .stock-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .position-card .stock-id {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .position-card .price-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        
+        .position-card .price-item {
+            text-align: center;
+        }
+        
+        .position-card .price-label {
+            font-size: 0.8rem;
+            color: #999;
+        }
+        
+        .position-card .price-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .btn-buy {
+            background-color: #dc3545;
+            border: none;
+        }
+        
+        .btn-sell {
+            background-color: #198754;
+            border: none;
+        }
+        
+        .trade-history {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .trade-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .trade-item:last-child {
+            border-bottom: none;
+        }
+        
+        .alert-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+        
+        .alert-stop-loss {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-target {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- 標題 -->
+        <div class="portfolio-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-wallet me-2"></i>虛擬倉位管理</h2>
+                    <p class="mb-0 opacity-75">模擬投資，AI 建議，投資回顧</p>
+                </div>
+                <div>
+                    <button class="btn btn-outline-light me-2" onclick="loadPortfolio()">
+                        <i class="fas fa-sync me-2"></i>重新整理
+                    </button>
+                    <button class="btn btn-outline-light" onclick="resetPortfolio()">
+                        <i class="fas fa-undo me-2"></i>重置倉位
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 資金摘要 -->
+        <div class="row" id="summarySection">
+            <div class="col-md-3">
+                <div class="summary-card">
+                    <h6><i class="fas fa-coins me-2"></i>初始資金</h6>
+                    <div class="value" id="initialCapital">-</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-card">
+                    <h6><i class="fas fa-money-bill-wave me-2"></i>目前總值</h6>
+                    <div class="value" id="totalValue">-</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-card">
+                    <h6><i class="fas fa-chart-line me-2"></i>總損益</h6>
+                    <div class="value" id="totalProfitLoss">-</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="summary-card">
+                    <h6><i class="fas fa-percentage me-2"></i>報酬率</h6>
+                    <div class="value" id="totalReturn">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 操作按鈕 -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <i class="fas fa-shopping-cart me-2"></i>買入股票
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <input type="text" class="form-control mb-2" id="buyStockId" placeholder="股票代碼" value="2330.TW">
+                            </div>
+                            <div class="col-md-4">
+                                <input type="text" class="form-control mb-2" id="buyStockName" placeholder="股票名稱" value="台積電">
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" class="form-control mb-2" id="buyAmount" placeholder="投資金額" value="100000">
+                            </div>
+                        </div>
+                        <button class="btn btn-buy btn-lg w-100" onclick="aiBuy()">
+                            <i class="fas fa-robot me-2"></i>AI 分析後買入
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-hand-holding-usd me-2"></i>賣出股票
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <input type="text" class="form-control mb-2" id="sellStockId" placeholder="股票代碼">
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" class="form-control mb-2" id="sellShares" placeholder="賣出股數">
+                            </div>
+                            <div class="col-md-4">
+                                <input type="number" class="form-control mb-2" id="sellPrice" placeholder="賣出價格">
+                            </div>
+                        </div>
+                        <button class="btn btn-sell btn-lg w-100" onclick="manualSell()">
+                            <i class="fas fa-money-bill-wave me-2"></i>手動賣出
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 警報區域 -->
+        <div class="card mb-4" id="alertsSection" style="display: none;">
+            <div class="card-header bg-warning text-dark">
+                <i class="fas fa-bell me-2"></i>停損停利警報
+            </div>
+            <div class="card-body" id="alertsList">
+            </div>
+        </div>
+        
+        <!-- 持倉列表 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-briefcase me-2"></i>目前持倉
+                <span class="badge bg-primary ms-2" id="positionCount">0</span>
+            </div>
+            <div class="card-body" id="positionsList">
+                <p class="text-muted text-center">載入中...</p>
+            </div>
+        </div>
+        
+        <!-- 交易歷史 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-history me-2"></i>交易歷史
+            </div>
+            <div class="card-body">
+                <div class="trade-history" id="tradeHistory">
+                    <p class="text-muted text-center">載入中...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 投資回顧 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-chart-pie me-2"></i>投資回顧報告
+                <button class="btn btn-sm btn-outline-primary float-end" onclick="generateReview()">
+                    <i class="fas fa-sync me-1"></i>生成報告
+                </button>
+            </div>
+            <div class="card-body">
+                <pre id="reviewReport" style="white-space: pre-wrap; background-color: #f8f9fa; padding: 20px; border-radius: 10px;">
+點擊「生成報告」按鈕查看投資回顧
+                </pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api/v1';
+        
+        // 載入倉位資料
+        window.onload = function() {
+            loadPortfolio();
+            checkAlerts();
+        };
+        
+        async function loadPortfolio() {
+            try {
+                const response = await fetch(`${API_BASE}/portfolio/summary`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateSummary(data.data.summary);
+                    updatePositions(data.data.positions);
+                    loadTradeHistory();
+                } else {
+                    alert('載入失敗: ' + (data.error || '未知錯誤'));
+                }
+            } catch (error) {
+                console.error('載入倉位失敗:', error);
+            }
+        }
+        
+        function updateSummary(summary) {
+            document.getElementById('initialCapital').textContent = formatNumber(summary.initial_capital);
+            document.getElementById('totalValue').textContent = formatNumber(summary.total_value);
+            
+            const plElement = document.getElementById('totalProfitLoss');
+            plElement.textContent = formatNumber(summary.total_profit_loss, true);
+            plElement.className = 'value ' + (summary.total_profit_loss >= 0 ? 'profit' : 'loss');
+            
+            const returnElement = document.getElementById('totalReturn');
+            returnElement.textContent = summary.total_return_pct.toFixed(2) + '%';
+            returnElement.className = 'value ' + (summary.total_return_pct >= 0 ? 'profit' : 'loss');
+        }
+        
+        function updatePositions(positions) {
+            const container = document.getElementById('positionsList');
+            document.getElementById('positionCount').textContent = positions.length;
+            
+            if (positions.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center">目前沒有持倉</p>';
+                return;
+            }
+            
+            let html = '';
+            positions.forEach(pos => {
+                const isProfit = pos.profit_loss >= 0;
+                const statusClass = isProfit ? 'profit' : 'loss';
+                
+                html += `
+                <div class="position-card ${statusClass}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="stock-name">${pos.stock_name}</div>
+                            <div class="stock-id">${pos.stock_id} • ${pos.shares} 股</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="badge ${isProfit ? 'bg-danger' : 'bg-success'}">
+                                ${isProfit ? '+' : ''}${pos.profit_loss_pct.toFixed(2)}%
+                            </div>
+                            <div class="small text-muted">${pos.status}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="price-info">
+                        <div class="price-item">
+                            <div class="price-label">進場價</div>
+                            <div class="price-value">${pos.entry_price.toFixed(1)}</div>
+                        </div>
+                        <div class="price-item">
+                            <div class="price-label">目前價</div>
+                            <div class="price-value">${pos.current_price.toFixed(1)}</div>
+                        </div>
+                        <div class="price-item">
+                            <div class="price-label">目標價</div>
+                            <div class="price-value">${pos.target_price.toFixed(1)}</div>
+                        </div>
+                        <div class="price-item">
+                            <div class="price-label">停損價</div>
+                            <div class="price-value">${pos.stop_loss.toFixed(1)}</div>
+                        </div>
+                        <div class="price-item">
+                            <div class="price-label">損益</div>
+                            <div class="price-value ${isProfit ? 'profit' : 'loss'}">${formatNumber(pos.profit_loss, true)}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <small class="text-muted">進場原因: ${pos.entry_reason.substring(0, 100)}...</small>
+                    </div>
+                    
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-danger" onclick="quickSell('${pos.stock_id}', ${pos.shares}, ${pos.current_price})">
+                            <i class="fas fa-shopping-cart me-1"></i>賣出全部
+                        </button>
+                    </div>
+                </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        async function loadTradeHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/portfolio/history?limit=20`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const container = document.getElementById('tradeHistory');
+                    const trades = data.data.trades;
+                    
+                    if (trades.length === 0) {
+                        container.innerHTML = '<p class="text-muted text-center">尚無交易記錄</p>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    trades.forEach(trade => {
+                        const isBuy = trade.trade_type === 'buy';
+                        const icon = isBuy ? '🛒' : '💰';
+                        const color = isBuy ? 'text-danger' : 'text-success';
+                        
+                        html += `
+                        <div class="trade-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="${color}">${icon} ${isBuy ? '買入' : '賣出'}</span>
+                                    <strong class="ms-2">${trade.stock_name}</strong>
+                                    <span class="text-muted ms-2">${trade.stock_id}</span>
+                                </div>
+                                <div class="text-end">
+                                    <div>${trade.shares} 股 @ ${trade.price.toFixed(1)}</div>
+                                    <div class="small text-muted">${trade.date}</div>
+                                    ${trade.profit_loss !== null ? 
+                                        `<div class="small ${trade.profit_loss >= 0 ? 'profit' : 'loss'}">
+                                            損益: ${formatNumber(trade.profit_loss, true)} (${trade.profit_loss_pct.toFixed(2)}%)
+                                        </div>` : ''}
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-1">${trade.reason}</div>
+                        </div>
+                        `;
+                    });
+                    
+                    container.innerHTML = html;
+                }
+            } catch (error) {
+                console.error('載入交易歷史失敗:', error);
+            }
+        }
+        
+        async function checkAlerts() {
+            try {
+                const response = await fetch(`${API_BASE}/portfolio/alerts`);
+                const data = await response.json();
+                
+                if (data.success && data.data.length > 0) {
+                    const section = document.getElementById('alertsSection');
+                    const list = document.getElementById('alertsList');
+                    
+                    let html = '';
+                    data.data.forEach(alert => {
+                        const alertClass = alert.type === 'stop_loss' ? 'alert-stop-loss' : 'alert-target';
+                        html += `<div class="alert-item ${alertClass}">${alert.message}</div>`;
+                    });
+                    
+                    list.innerHTML = html;
+                    section.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('檢查警報失敗:', error);
+            }
+        }
+        
+        async function aiBuy() {
+            const stockId = document.getElementById('buyStockId').value;
+            const amount = document.getElementById('buyAmount').value;
+            
+            if (!stockId) {
+                alert('請輸入股票代碼');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/portfolio/ai-buy?stock_id=${stockId}&amount=${amount}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    loadPortfolio();
+                } else {
+                    alert('❌ ' + (data.message || data.error || '買入失敗'));
+                }
+            } catch (error) {
+                alert('錯誤: ' + error.message);
+            }
+        }
+        
+        async function manualSell() {
+            const stockId = document.getElementById('sellStockId').value;
+            const shares = document.getElementById('sellShares').value;
+            const price = document.getElementById('sellPrice').value;
+            
+            if (!stockId || !shares || !price) {
+                alert('請填寫完整資訊');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/portfolio/sell?stock_id=${stockId}&shares=${shares}&sell_price=${price}&reason=手動賣出`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    loadPortfolio();
+                } else {
+                    alert('❌ ' + (data.error || '賣出失敗'));
+                }
+            } catch (error) {
+                alert('錯誤: ' + error.message);
+            }
+        }
+        
+        function quickSell(stockId, shares, price) {
+            if (confirm(`確定要賣出 ${stockId} 全部 ${shares} 股嗎？\n目前價格: ${price}`)) {
+                fetch(`${API_BASE}/portfolio/sell?stock_id=${stockId}&shares=${shares}&sell_price=${price}&reason=快速賣出`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('✅ ' + data.message);
+                        loadPortfolio();
+                    } else {
+                        alert('❌ ' + (data.error || '賣出失敗'));
+                    }
+                })
+                .catch(error => alert('錯誤: ' + error.message));
+            }
+        }
+        
+        async function generateReview() {
+            try {
+                const response = await fetch(`${API_BASE}/portfolio/review`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('reviewReport').textContent = data.data.report;
+                } else {
+                    alert('生成報告失敗: ' + (data.error || '未知錯誤'));
+                }
+            } catch (error) {
+                alert('錯誤: ' + error.message);
+            }
+        }
+        
+        async function resetPortfolio() {
+            if (!confirm('確定要重置倉位嗎？所有交易記錄將被清除！')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/portfolio/reset`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    loadPortfolio();
+                } else {
+                    alert('❌ ' + (data.error || '重置失敗'));
+                }
+            } catch (error) {
+                alert('錯誤: ' + error.message);
+            }
+        }
+        
+        function formatNumber(num, showSign = false) {
+            if (num === null || num === undefined) return '-';
+            const formatted = num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+            if (showSign && num > 0) return '+' + formatted;
+            return formatted;
+        }
+    </script>
+</body>
+</html>

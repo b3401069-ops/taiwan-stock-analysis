@@ -185,6 +185,16 @@ def create_app() -> FastAPI:
             with open(test_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>測試頁面不存在</h1>")
+    
+    # 添加倉位頁面
+    @app.get("/portfolio", response_class=HTMLResponse)
+    async def portfolio_page():
+        """虛擬倉位管理頁面"""
+        portfolio_path = os.path.join(os.path.dirname(__file__), "static", "portfolio.html")
+        if os.path.exists(portfolio_path):
+            with open(portfolio_path, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+        return HTMLResponse(content="<h1>倉位頁面不存在</h1>")
 
     # 添加根端點
     @app.get("/")
@@ -197,6 +207,7 @@ def create_app() -> FastAPI:
             "app": "/app",
             "chat": "/chat",
             "test": "/test",
+            "portfolio": "/portfolio",
             "api": "/api/v1"
         }
     
