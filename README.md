@@ -127,6 +127,40 @@ curl -X POST "http://localhost:8080/api/v1/db/sync/2330.TW?months=12"
 curl "http://localhost:8080/api/v1/twse/daily"
 ```
 
+## 富邦證券 SDK 整合
+
+系統支援整合富邦證券 SDK，提供即時報價、完整財報、籌碼面數據。
+
+### 架構
+
+```
+主電腦 (本機)                另一台電腦 (有富邦SDK)
+┌──────────────────┐         ┌──────────────────┐
+│ OpenClaw Agent   │  HTTP   │ 富邦 SDK 服務    │
+│ 股票分析系統     │ ──────→ │ (fubon_service)  │
+│ main.py          │         │ Port: 8081       │
+└──────────────────┘         └──────────────────┘
+```
+
+### 安裝步驟
+
+1. 在有富邦 SDK 的電腦上執行：
+```bash
+pip install -r requirements_fubon.txt
+export FUBON_API_KEY=your_key
+export FUBON_API_SECRET=your_secret
+python fubon_service.py
+```
+
+2. 在主電腦連接：
+```python
+from agents.openclaw_agent import get_openclaw_agent
+agent = get_openclaw_agent(fubon_service_url="http://192.168.1.100:8081")
+result = await agent.analyze_stock("2330.TW")
+```
+
+詳細說明請參考 [富邦 SDK 整合指南](docs/FUBON_SETUP.md)
+
 ## 開發筆記
 
 ### TWSE API 注意事項
@@ -141,6 +175,15 @@ curl "http://localhost:8080/api/v1/twse/daily"
 - 目前使用 **SQLite**（個人開發）
 - 未來升級只需改連接字串，ORM 代碼不用改
 - 詳見 [資料庫選擇決策](docs/DATABASE_DECISION.md)
+
+### 財報數據來源
+
+| 來源 | 免費? | 資料內容 |
+|------|-------|---------|
+| 公開資訊觀測站 (MOPS) | ✅ | 三大報表 |
+| TWSE OpenAPI | ✅ | 基本財務指標 |
+| Yahoo Finance | ✅ | 財報、估值 |
+| **富邦證券 SDK** | ✅ | 即時報價、完整財報、籌碼 |
 
 ## 授權
 
