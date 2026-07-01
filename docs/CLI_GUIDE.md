@@ -11,8 +11,15 @@
 8. [AI 分析命令](#ai-分析命令)
 9. [市場分析命令](#市場分析命令)
 10. [回測命令](#回測命令)
-11. [進階使用](#進階使用)
-12. [常見問題](#常見問題)
+11. [關注清單命令](#關注清單命令)
+12. [報告命令](#報告命令)
+13. [全市場選股掃描](#全市場選股掃描)
+14. [每日早晨例行流程](#每日早晨例行流程)
+15. [通知命令](#通知命令)
+16. [資料同步命令](#資料同步命令)
+17. [資料查詢命令](#資料查詢命令)
+18. [進階使用](#進階使用)
+19. [常見問題](#常見問題)
 
 ---
 
@@ -811,11 +818,368 @@ else:
 
 ---
 
+## 📋 關注清單命令
+
+### 新增關注股票
+
+```bash
+# 新增股票到關注清單
+python cli.py watchlist add 2330 --name 台積電
+
+# 新增多檔股票
+python cli.py watchlist add 2317 --name 鴻海
+python cli.py watchlist add 2454 --name 聯發科
+```
+
+### 移除關注股票
+
+```bash
+# 從關注清單移除股票
+python cli.py watchlist remove 2330
+```
+
+### 顯示關注清單
+
+```bash
+# 顯示所有關注股票
+python cli.py watchlist list
+```
+
+**輸出範例:**
+```
+📋 關注清單
+==================================================
+ 1. 2330 - 台積電
+    新增日期: 2026-07-01T10:13:18.082990
+
+ 2. 2317 - 鴻海
+    新增日期: 2026-07-01T10:13:25.123456
+
+ 3. 2454 - 聯發科
+    新增日期: 2026-07-01T10:13:30.789012
+```
+
+### 同步關注清單資料
+
+```bash
+# 同步所有關注股票的資料
+python cli.py watchlist sync
+```
+
+---
+
+## 📊 報告命令
+
+### 每日報告
+
+```bash
+# 產生每日報告
+python cli.py report daily --top-n 10
+
+# 產生報告並發送通知
+python cli.py report daily --top-n 10 --notify
+```
+
+### 每週報告
+
+```bash
+# 產生每週報告
+python cli.py report weekly
+
+# 產生報告並發送通知
+python cli.py report weekly --notify
+```
+
+### 每月報告
+
+```bash
+# 產生每月報告
+python cli.py report monthly
+
+# 產生報告並發送通知
+python cli.py report monthly --notify
+```
+
+---
+
+## 🔍 全市場選股掃描
+
+### 基本掃描
+
+```bash
+# 全市場選股掃描（前 20 名）
+python cli.py discover --top-n 20
+
+# 設定最低價格
+python cli.py discover --top-n 20 --min-price 50
+```
+
+### 匯出結果
+
+```bash
+# 匯出到 CSV 檔案
+python cli.py discover --top-n 20 --export picks.csv
+
+# 匯出並發送通知
+python cli.py discover --top-n 20 --export picks.csv --notify
+```
+
+**輸出範例:**
+```
+🔍 全市場選股掃描
+==================================================
+
+篩選結果 (前 20 名):
+--------------------------------------------------
+ 1. 台積電 (2330.TW)
+    綜合分數: 0.7234
+    目前價格: 2450.00
+
+ 2. 聯發科 (2454.TW)
+    綜合分數: 0.6891
+    目前價格: 1200.00
+
+📁 匯出到: picks.csv
+✅ 已匯出 20 筆資料
+```
+
+---
+
+## 🌅 每日早晨例行流程
+
+### 完整流程
+
+```bash
+# 執行完整早晨例行流程（包含同步）
+python cli.py morning-routine --notify
+```
+
+### 跳過同步
+
+```bash
+# 跳過資料同步（資料已新鮮時）
+python cli.py morning-routine --skip-sync --notify
+```
+
+### 預覽模式
+
+```bash
+# 預覽流程（不實際執行）
+python cli.py morning-routine --dry-run
+```
+
+**流程說明:**
+1. **同步關注清單資料** - 更新所有關注股票的資料
+2. **市場狀態分析** - 分析目前市場狀態
+3. **產業輪動分析** - 分析產業強度變化
+4. **概念股輪動分析** - 分析概念股熱度
+5. **AI 選股摘要** - 產生 AI 選股建議
+6. **發送通知** - 發送報告通知
+
+**輸出範例:**
+```
+🌅 每日早晨例行流程
+==================================================
+
+📥 步驟 1: 同步關注清單資料
+  ✅ 2330 同步成功
+  ✅ 2317 同步成功
+
+📊 步驟 2: 市場狀態分析
+  • 市場狀態: 多頭
+  • 信心水平: 75%
+
+🏭 步驟 3: 產業輪動分析
+  • 半導體: 0.8424 (strong_buy)
+  • AI 概念: 0.7035 (strong_buy)
+
+💡 步驟 4: 概念股輪動分析
+  • 被動元件: 0.8682 (hot)
+  • ABF 載板: 0.8285 (hot)
+
+🤖 步驟 5: AI 選股摘要
+  • 市場建議: 積極佈局
+  • 建議部位: 70-90%
+
+📱 步驟 6: 發送通知
+  ✅ 通知已發送
+
+==================================================
+✅ 每日早晨例行流程完成
+   完成步驟: 6/6
+   執行時間: 15.3 秒
+==================================================
+```
+
+---
+
+## 📱 通知命令
+
+### 發送一般訊息
+
+```bash
+# 發送文字訊息到 Discord 和 Line
+python cli.py notify --message "台積電今日漲幅超過5%"
+```
+
+### 發送股票警報
+
+```bash
+# 發送股票警報
+python cli.py notify --stock-alert 2330.TW --type 停損警報 --message "跌破支撐"
+```
+
+**警報類型:**
+- `停損警報` - 股價跌破停損點
+- `停利警報` - 股價達到停利目標
+- `漲幅警報` - 漲幅超過設定門檻
+- `跌幅警報` - 跌幅超過設定門檻
+- `一般警報` - 其他異常情況
+
+---
+
+## 🔄 資料同步命令
+
+### 同步指定股票
+
+```bash
+# 同步指定股票資料
+python cli.py sync --stocks 2330 2317 2454
+```
+
+### 同步關注清單
+
+```bash
+# 同步關注清單所有股票
+python cli.py sync
+```
+
+---
+
+## 📊 資料查詢命令
+
+### 系統狀態
+
+```bash
+# 查詢系統狀態
+python cli.py status
+```
+
+**輸出範例:**
+```
+📊 系統狀態
+==================================================
+✅ 伺服器狀態: 正常
+   版本: 1.0.0
+   資料庫: SQLite
+
+📋 關注清單: 3 檔股票
+📱 通知歷史: 15 筆
+```
+
+### 資料驗證
+
+```bash
+# 驗證關注清單資料
+python cli.py validate
+```
+
+**輸出範例:**
+```
+🔍 資料驗證
+==================================================
+正在驗證 3 檔股票...
+✅ 2330 - 台積電
+✅ 2317 - 鴻海
+✅ 2454 - 聯發科
+```
+
+---
+
+## 🚀 進階使用
+
+### 自動化排程
+
+**使用 cron 排程 (Linux/Mac):**
+```bash
+# 編輯 crontab
+crontab -e
+
+# 每天早上 9:00 執行早晨例行流程
+0 9 * * 1-5 /path/to/cli.py morning-routine --notify
+
+# 每天下午 5:30 執行每日報告
+30 17 * * 1-5 /path/to/cli.py report daily --notify
+
+# 每週五下午 6:00 產生週報
+0 18 * * 5 /path/to/cli.py report weekly --notify
+
+# 每月第一個週一早上 9:00 產生月報
+0 9 1-7 * 1 /path/to/cli.py report monthly --notify
+```
+
+### 批次處理腳本
+
+建立檔案 `daily_workflow.sh`:
+```bash
+#!/bin/bash
+
+echo "開始每日工作流程..."
+
+# 1. 同步資料
+python cli.py sync
+
+# 2. 產生報告
+python cli.py report daily --top-n 10 --notify
+
+# 3. 全市場掃描
+python cli.py discover --top-n 20 --export today_picks.csv --notify
+
+echo "每日工作流程完成！"
+```
+
+### 整合到其他系統
+
+```python
+import subprocess
+import json
+
+def get_morning_routine():
+    """執行早晨例行流程"""
+    result = subprocess.run(
+        "python cli.py morning-routine --skip-sync",
+        shell=True,
+        capture_output=True,
+        text=True
+    )
+    return result.stdout
+
+def get_daily_report(top_n=10):
+    """取得每日報告"""
+    result = subprocess.run(
+        f"python cli.py report daily --top-n {top_n}",
+        shell=True,
+        capture_output=True,
+        text=True
+    )
+    return result.stdout
+
+# 使用範例
+morning_output = get_morning_routine()
+print(morning_output)
+
+report_output = get_daily_report(10)
+print(report_output)
+```
+
+---
+
 ## 📚 相關資源
 
 - [台灣股票分析工具 GitHub](https://github.com/b3401069-ops/taiwan-stock-analysis)
 - [API 文件](http://localhost:9999/docs)
 - [Web 介面](http://localhost:9999/app)
+- [Discord/Line 通知服務](NOTIFICATION_GUIDE.md)
 
 ---
 
