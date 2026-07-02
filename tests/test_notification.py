@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch, MagicMock
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestNotificationService:
@@ -16,7 +17,7 @@ class TestNotificationService:
             "https://discord.com/api/webhooks/123456789/abcdefg",
             "https://discord.com/api/webhooks/987654321/xyz123",
         ]
-        
+
         for url in valid_urls:
             assert url.startswith("https://discord.com/api/webhooks/")
             assert len(url.split("/")) >= 7
@@ -27,10 +28,12 @@ class TestNotificationService:
             "abc123def456ghi789",
             "xxxxxxxxxxxxxxxxxxxxxxxx",
         ]
-        
+
         for token in valid_tokens:
             assert len(token) > 0
-            assert token.isalnum() or set(token).issubset(set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"))
+            assert token.isalnum() or set(token).issubset(
+                set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+            )
 
     def test_notification_history_structure(self, sample_notification_history):
         """通知歷史結構測試。"""
@@ -39,10 +42,10 @@ class TestNotificationService:
             assert "content" in notification
             assert "timestamp" in notification
             assert "success" in notification
-            
+
             # 類型應為 discord 或 line
             assert notification["type"] in ["discord", "line"]
-            
+
             # 成功狀態應為布林值
             assert isinstance(notification["success"], bool)
 
@@ -56,11 +59,11 @@ class TestNotificationService:
             "price": 2400.0,
             "change_percent": -2.5,
         }
-        
+
         required_fields = ["stock_id", "stock_name", "alert_type", "message"]
         for field in required_fields:
             assert field in alert
-        
+
         # 價格應為正數
         assert alert["price"] > 0
 
@@ -75,7 +78,7 @@ class TestNotificationService:
                 "position_size": "70-90%",
             },
         }
-        
+
         assert "report_type" in report
         assert "timestamp" in report
         assert "summary" in report
@@ -86,10 +89,10 @@ class TestNotificationService:
         mock_instance = MagicMock()
         mock_instance.send_discord_message.return_value = True
         mock_service.return_value = mock_instance
-        
+
         service = mock_service()
         result = service.send_discord_message("測試訊息")
-        
+
         assert result is True
         mock_instance.send_discord_message.assert_called_once_with("測試訊息")
 
@@ -99,10 +102,10 @@ class TestNotificationService:
         mock_instance = MagicMock()
         mock_instance.send_line_message.return_value = True
         mock_service.return_value = mock_instance
-        
+
         service = mock_service()
         result = service.send_line_message("測試訊息")
-        
+
         assert result is True
         mock_instance.send_line_message.assert_called_once_with("測試訊息")
 
@@ -112,7 +115,7 @@ class TestNotificationService:
         mock_instance = MagicMock()
         mock_instance.send_discord_stock_alert.return_value = True
         mock_service.return_value = mock_instance
-        
+
         service = mock_service()
         result = service.send_discord_stock_alert(
             stock_id="2330.TW",
@@ -122,7 +125,7 @@ class TestNotificationService:
             price=2400.0,
             change_percent=-2.5,
         )
-        
+
         assert result is True
 
     @patch("services.notification.get_notification_service")
@@ -131,25 +134,29 @@ class TestNotificationService:
         mock_instance = MagicMock()
         mock_instance.send_discord_report.return_value = True
         mock_service.return_value = mock_instance
-        
+
         service = mock_service()
         result = service.send_discord_report(
             report_type="每日報告",
             report_data={"summary": "市場處於多頭狀態"},
         )
-        
+
         assert result is True
 
     @patch("services.notification.get_notification_service")
-    def test_notification_history_retrieval(self, mock_service, sample_notification_history):
+    def test_notification_history_retrieval(
+        self, mock_service, sample_notification_history
+    ):
         """通知歷史取得測試。"""
         mock_instance = MagicMock()
-        mock_instance.get_notification_history.return_value = sample_notification_history
+        mock_instance.get_notification_history.return_value = (
+            sample_notification_history
+        )
         mock_service.return_value = mock_instance
-        
+
         service = mock_service()
         history = service.get_notification_history(limit=10)
-        
+
         assert len(history) == 2
         assert history[0]["type"] == "discord"
 
@@ -162,7 +169,7 @@ class TestNotificationService:
             "跌幅警報",
             "一般警報",
         ]
-        
+
         for alert_type in alert_types:
             assert alert_type in alert_types
 
@@ -174,7 +181,7 @@ class TestNotificationService:
             "每月報告",
             "AI 選股摘要",
         ]
-        
+
         for report_type in report_types:
             assert report_type in report_types
 
@@ -187,14 +194,14 @@ class TestNotificationFormatting:
         embed = {
             "title": "🚨 停損警報: 台積電 (2330.TW)",
             "description": "跌破支撐",
-            "color": 0xff0000,
+            "color": 0xFF0000,
             "fields": [
                 {"name": "目前價格", "value": "NT$ 2,400.00", "inline": True},
                 {"name": "漲跌幅", "value": "🔴 -2.50%", "inline": True},
             ],
             "timestamp": datetime.now().isoformat(),
         }
-        
+
         assert "title" in embed
         assert "description" in embed
         assert "fields" in embed
@@ -212,7 +219,7 @@ class TestNotificationFormatting:
 
 ⏰ 時間: 2024-01-15 15:30:00
 """
-        
+
         # 驗證訊息包含必要元素
         assert "停損警報" in message
         assert "2330.TW" in message
@@ -236,7 +243,7 @@ class TestNotificationFormatting:
 1. 台積電 (2330.TW) - 分數: 0.7234
 2. 聯發科 (2454.TW) - 分數: 0.6891
 """
-        
+
         # 驗證訊息包含必要元素
         assert "AI 選股摘要" in message
         assert "執行摘要" in message

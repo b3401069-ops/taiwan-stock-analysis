@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch, MagicMock
-import pandas as pd
+from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pandas as pd
+import pytest
 
 
 class TestMultiFactorScreener:
@@ -22,25 +23,54 @@ class TestMultiFactorScreener:
             "liquidity": 0.1,
             "institutional": 0.1,
         }
-        
+
         # 驗證權重總和
         total = sum(default_weights.values())
         assert total == pytest.approx(1.0, abs=0.01)
-        
+
         # 驗證所有因子
-        expected_factors = ["momentum", "value", "quality", "size", "liquidity", "institutional"]
+        expected_factors = [
+            "momentum",
+            "value",
+            "quality",
+            "size",
+            "liquidity",
+            "institutional",
+        ]
         for factor in expected_factors:
             assert factor in default_weights
 
     def test_momentum_score_calculation(self):
         """動量分數計算測試。"""
         # 建立測試資料
-        prices = pd.Series([100, 102, 105, 103, 108, 110, 112, 115, 113, 118,
-                           120, 122, 125, 123, 128, 130, 132, 135, 133, 138])
-        
+        prices = pd.Series(
+            [
+                100,
+                102,
+                105,
+                103,
+                108,
+                110,
+                112,
+                115,
+                113,
+                118,
+                120,
+                122,
+                125,
+                123,
+                128,
+                130,
+                132,
+                135,
+                133,
+                138,
+            ]
+        )
+
         # 計算 20 日動量
         momentum_20d = (prices.iloc[-1] - prices.iloc[0]) / prices.iloc[0]
-        
+
         # 動量應為正數（持續上漲）
         assert momentum_20d > 0
 
@@ -49,9 +79,9 @@ class TestMultiFactorScreener:
         # PE ratio
         pe_ratio = 15.0
         pe_score = 1 / pe_ratio  # PE 越低，分數越高
-        
+
         assert pe_score > 0
-        
+
         # 較低的 PE 應有較高的分數
         low_pe_score = 1 / 10.0
         high_pe_score = 1 / 30.0
@@ -62,7 +92,7 @@ class TestMultiFactorScreener:
         # ROE
         roe = 0.20  # 20%
         assert 0 < roe < 1
-        
+
         # 較高的 ROE 應有較高的分數
         high_roe = 0.25
         low_roe = 0.10
@@ -80,7 +110,7 @@ class TestMultiFactorScreener:
         volume = 10_000_000
         avg_volume = 8_000_000
         volume_ratio = volume / avg_volume
-        
+
         assert volume_ratio > 0
 
     def test_institutional_score_calculation(self):
@@ -89,7 +119,7 @@ class TestMultiFactorScreener:
         institutional_buy = 500_000
         institutional_sell = 300_000
         net_flow = institutional_buy - institutional_sell
-        
+
         assert net_flow > 0  # 正向法人流
 
     def test_composite_score_calculation(self):
@@ -103,7 +133,7 @@ class TestMultiFactorScreener:
             "liquidity": 0.1,
             "institutional": 0.1,
         }
-        
+
         # 因子分數
         scores = {
             "momentum": 0.8,
@@ -113,21 +143,23 @@ class TestMultiFactorScreener:
             "liquidity": 0.75,
             "institutional": 0.85,
         }
-        
+
         # 計算綜合分數
-        composite_score = sum(scores[factor] * weight for factor, weight in weights.items())
-        
+        composite_score = sum(
+            scores[factor] * weight for factor, weight in weights.items()
+        )
+
         assert 0 <= composite_score <= 1
 
     def test_factor_normalization_min_max(self):
         """因子正規化（最小最大法）測試。"""
         values = pd.Series([10, 20, 30, 40, 50])
-        
+
         # 最小最大正規化
         min_val = values.min()
         max_val = values.max()
         normalized = (values - min_val) / (max_val - min_val)
-        
+
         # 正規化後應在 0-1 之間
         assert normalized.min() == 0
         assert normalized.max() == 1
@@ -135,25 +167,25 @@ class TestMultiFactorScreener:
     def test_factor_normalization_zscore(self):
         """因子正規化（Z-score）測試。"""
         values = pd.Series([10, 20, 30, 40, 50])
-        
+
         # Z-score 正規化
         mean = values.mean()
         std = values.std()
         zscores = (values - mean) / std
-        
+
         # Z-score 平均應接近 0
         assert abs(zscores.mean()) < 0.01
-        
+
         # Z-score 標準差應接近 1
         assert abs(zscores.std() - 1) < 0.01
 
     def test_factor_percentile_rank(self):
         """因子百分位排名測試。"""
         values = pd.Series([10, 20, 30, 40, 50])
-        
+
         # 百分位排名
         ranks = values.rank(pct=True)
-        
+
         # 排名應在 0-1 之間
         assert ranks.min() > 0
         assert ranks.max() == 1.0
@@ -175,7 +207,7 @@ class TestMultiFactorScreener:
                 },
             },
         ]
-        
+
         # 驗證結構
         for stock in result:
             assert "rank" in stock
@@ -183,7 +215,7 @@ class TestMultiFactorScreener:
             assert "stock_name" in stock
             assert "composite_score" in stock
             assert "details" in stock
-            
+
             # 驗證分數範圍
             assert 0 <= stock["composite_score"] <= 1
 
@@ -195,7 +227,7 @@ class TestMultiFactorScreener:
             {"rank": 2, "composite_score": 0.6891},
             {"rank": 3, "composite_score": 0.6543},
         ]
-        
+
         # 驗證排名順序
         for i in range(len(results) - 1):
             assert results[i]["rank"] < results[i + 1]["rank"]
@@ -205,14 +237,13 @@ class TestMultiFactorScreener:
         """選股 Top N 測試。"""
         # 模擬選股結果
         all_results = [
-            {"rank": i, "composite_score": 0.8 - i * 0.05}
-            for i in range(1, 21)
+            {"rank": i, "composite_score": 0.8 - i * 0.05} for i in range(1, 21)
         ]
-        
+
         # 取前 10 名
         top_n = 10
         top_results = all_results[:top_n]
-        
+
         assert len(top_results) == top_n
         assert top_results[0]["rank"] == 1
         assert top_results[-1]["rank"] == top_n
@@ -231,7 +262,7 @@ class TestFactorWeights:
             "liquidity": 0.1,
             "institutional": 0.1,
         }
-        
+
         total = sum(weights.values())
         assert total == pytest.approx(1.0, abs=0.01)
 
@@ -245,7 +276,7 @@ class TestFactorWeights:
             "liquidity": 0.1,
             "institutional": 0.1,
         }
-        
+
         for weight in weights.values():
             assert weight >= 0
 
@@ -259,16 +290,16 @@ class TestFactorWeights:
             "liquidity": 0.1,
             "institutional": 0.1,
         }
-        
+
         # 更新權重
         new_weights = original_weights.copy()
         new_weights["momentum"] = 0.3
         new_weights["value"] = 0.2
-        
+
         # 重新正規化
         total = sum(new_weights.values())
         normalized_weights = {k: v / total for k, v in new_weights.items()}
-        
+
         # 驗證總和
         assert sum(normalized_weights.values()) == pytest.approx(1.0, abs=0.01)
 
@@ -282,7 +313,7 @@ class TestFactorWeights:
             "liquidity": 0.03,
             "institutional": 0.02,
         }
-        
+
         # 驗證總和
         total = sum(custom_weights.values())
         assert total == pytest.approx(1.0, abs=0.01)
@@ -291,9 +322,9 @@ class TestFactorWeights:
         """等權重測試。"""
         factors = ["momentum", "value", "quality", "size", "liquidity", "institutional"]
         equal_weight = 1.0 / len(factors)
-        
+
         equal_weights = {factor: equal_weight for factor in factors}
-        
+
         # 驗證總和
         total = sum(equal_weights.values())
         assert total == pytest.approx(1.0, abs=0.01)

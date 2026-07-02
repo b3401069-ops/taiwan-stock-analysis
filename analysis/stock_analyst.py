@@ -2,17 +2,19 @@
 台灣股票分析工具 - 本地 AI 分析引擎
 整合技術分析、基本面分析、ML 預測，生成綜合分析報告
 """
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Any
+
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 from loguru import logger
 
+from analysis.fundamental_analysis import FundamentalAnalysis
+from analysis.ml_prediction import MLPrediction
+from analysis.technical_analysis import TechnicalAnalysis
 from data.data_fetcher import DataFetcher
 from data.stock_data import StockData
-from analysis.technical_analysis import TechnicalAnalysis
-from analysis.ml_prediction import MLPrediction
-from analysis.fundamental_analysis import FundamentalAnalysis
 
 
 class StockAnalyst:
@@ -25,7 +27,9 @@ class StockAnalyst:
         self.ml = MLPrediction()
         self.fundamental = FundamentalAnalysis()
 
-    async def analyze(self, stock_id: str, include_ml: bool = True, prediction_days: int = 5) -> Dict:
+    async def analyze(
+        self, stock_id: str, include_ml: bool = True, prediction_days: int = 5
+    ) -> Dict:
         """
         綜合分析股票
 
@@ -58,7 +62,9 @@ class StockAnalyst:
             ml_result = {}
             if include_ml:
                 try:
-                    ml_result = await self.ml.predict(stock_id, model="ensemble", days=prediction_days)
+                    ml_result = await self.ml.predict(
+                        stock_id, model="ensemble", days=prediction_days
+                    )
                 except Exception as e:
                     logger.warning(f"ML 預測失敗: {e}")
 
@@ -69,7 +75,7 @@ class StockAnalyst:
                 realtime=realtime,
                 tech_result=tech_result,
                 ml_result=ml_result,
-                df=df
+                df=df,
             )
 
             elapsed = (datetime.now() - start_time).total_seconds()
@@ -88,7 +94,7 @@ class StockAnalyst:
         realtime: Dict,
         tech_result: Dict,
         ml_result: Dict,
-        df: pd.DataFrame
+        df: pd.DataFrame,
     ) -> Dict:
         """生成綜合分析報告"""
 
@@ -114,7 +120,7 @@ class StockAnalyst:
             trend_analysis=trend_analysis,
             tech_summary=tech_summary,
             ml_summary=ml_summary,
-            tech_indicators=tech_indicators
+            tech_indicators=tech_indicators,
         )
 
         # 生成風險評估
@@ -126,7 +132,7 @@ class StockAnalyst:
             trend_analysis=trend_analysis,
             risk_assessment=risk_assessment,
             latest_price=latest_price,
-            tech_indicators=tech_indicators
+            tech_indicators=tech_indicators,
         )
 
         return {
@@ -138,30 +144,41 @@ class StockAnalyst:
                 "change_percent": change_pct,
                 "high_52w": price_data.get("summary", {}).get("highest_price", 0),
                 "low_52w": price_data.get("summary", {}).get("lowest_price", 0),
-                "avg_volume": df["volume"].tail(20).mean() if not df.empty else 0
+                "avg_volume": df["volume"].tail(20).mean() if not df.empty else 0,
             },
             "trend_analysis": trend_analysis,
             "technical_summary": tech_summary,
             "ml_prediction": {
                 "model": ml_predictions.get("ensemble", {}).get("model", "N/A"),
                 "trend": ml_predictions.get("ensemble", {}).get("trend", "N/A"),
-                "expected_return": ml_predictions.get("ensemble", {}).get("expected_return", 0),
-                "predictions": ml_predictions.get("ensemble", {}).get("predictions", [])[:5],
-                "model_agreement": ml_predictions.get("ensemble", {}).get("model_agreement", 0)
+                "expected_return": ml_predictions.get("ensemble", {}).get(
+                    "expected_return", 0
+                ),
+                "predictions": ml_predictions.get("ensemble", {}).get(
+                    "predictions", []
+                )[:5],
+                "model_agreement": ml_predictions.get("ensemble", {}).get(
+                    "model_agreement", 0
+                ),
             },
             "recommendation": recommendation,
             "risk_assessment": risk_assessment,
             "action_plan": action_plan,
             "analysis_summary": self._generate_text_summary(
                 stock_id, latest_price, trend_analysis, recommendation, risk_assessment
-            )
+            ),
         }
 
     def _analyze_trend(self, df: pd.DataFrame, tech_indicators: Dict) -> Dict:
         """分析價格趨勢"""
         try:
             if df.empty:
-                return {"short_term": "neutral", "medium_term": "neutral", "long_term": "neutral", "strength": 0}
+                return {
+                    "short_term": "neutral",
+                    "medium_term": "neutral",
+                    "long_term": "neutral",
+                    "strength": 0,
+                }
 
             close = df["close"]
 
@@ -175,14 +192,20 @@ class StockAnalyst:
 
             # 長期趨勢（60日）
             ma60 = close.rolling(60).mean()
-            long_trend = "up" if close.iloc[-1] > ma60.iloc[-1] else "down" if len(close) >= 60 else "neutral"
+            long_trend = (
+                "up"
+                if close.iloc[-1] > ma60.iloc[-1]
+                else "down" if len(close) >= 60 else "neutral"
+            )
 
             # 趨勢強度（用最近20日報酬率的標準差）
             returns = close.pct_change().tail(20)
             volatility = returns.std()
 
             # 動量（最近5日報酬率）
-            momentum = (close.iloc[-1] / close.iloc[-6] - 1) * 100 if len(close) >= 6 else 0
+            momentum = (
+                (close.iloc[-1] / close.iloc[-6] - 1) * 100 if len(close) >= 6 else 0
+            )
 
             # 趨勢評分（-100 到 100）
             score = 0
@@ -211,11 +234,16 @@ class StockAnalyst:
                 "score": round(score, 1),
                 "ma5": round(float(ma5.iloc[-1]), 2) if not ma5.empty else 0,
                 "ma20": round(float(ma20.iloc[-1]), 2) if not ma20.empty else 0,
-                "ma60": round(float(ma60.iloc[-1]), 2) if len(close) >= 60 else 0
+                "ma60": round(float(ma60.iloc[-1]), 2) if len(close) >= 60 else 0,
             }
         except Exception as e:
             logger.error(f"趨勢分析失敗: {e}")
-            return {"short_term": "neutral", "medium_term": "neutral", "long_term": "neutral", "score": 0}
+            return {
+                "short_term": "neutral",
+                "medium_term": "neutral",
+                "long_term": "neutral",
+                "score": 0,
+            }
 
     def _generate_recommendation(
         self,
@@ -223,7 +251,7 @@ class StockAnalyst:
         trend_analysis: Dict,
         tech_summary: Dict,
         ml_summary: Dict,
-        tech_indicators: Dict
+        tech_indicators: Dict,
     ) -> Dict:
         """生成投資建議"""
         try:
@@ -309,12 +337,20 @@ class StockAnalyst:
                 "confidence": round(confidence, 1),
                 "risk_level": risk_level,
                 "reasons": reasons,
-                "target_price": self._calculate_target_price(latest_price, trend_analysis, ml_summary),
-                "stop_loss": round(latest_price * 0.95, 2)
+                "target_price": self._calculate_target_price(
+                    latest_price, trend_analysis, ml_summary
+                ),
+                "stop_loss": round(latest_price * 0.95, 2),
             }
         except Exception as e:
             logger.error(f"生成建議失敗: {e}")
-            return {"action": "hold", "score": 0, "confidence": 50, "risk_level": "中", "reasons": []}
+            return {
+                "action": "hold",
+                "score": 0,
+                "confidence": 50,
+                "risk_level": "中",
+                "reasons": [],
+            }
 
     def _calculate_target_price(self, current: float, trend: Dict, ml: Dict) -> float:
         """計算目標價"""
@@ -361,7 +397,11 @@ class StockAnalyst:
             atr = tech_indicators.get("atr", {})
             if atr:
                 atr_value = atr.get("value", 0)
-                atr_pct = (atr_value / df["close"].iloc[-1]) * 100 if df["close"].iloc[-1] > 0 else 0
+                atr_pct = (
+                    (atr_value / df["close"].iloc[-1]) * 100
+                    if df["close"].iloc[-1] > 0
+                    else 0
+                )
                 if atr_pct > 3:
                     risk_score += 20
                     factors.append(f"ATR 偏高 ({atr_pct:.1f}%)")
@@ -392,7 +432,7 @@ class StockAnalyst:
                 "level": level,
                 "score": round(risk_score, 1),
                 "factors": factors,
-                "volatility_annual": round(volatility, 1)
+                "volatility_annual": round(volatility, 1),
             }
         except Exception as e:
             logger.error(f"風險評估失敗: {e}")
@@ -404,7 +444,7 @@ class StockAnalyst:
         trend_analysis: Dict,
         risk_assessment: Dict,
         latest_price: float,
-        tech_indicators: Dict
+        tech_indicators: Dict,
     ) -> Dict:
         """生成操作計劃"""
         try:
@@ -433,8 +473,8 @@ class StockAnalyst:
                         f"1. 在 {latest_price:.2f} 附近分批買入",
                         f"2. 設定停損點 {stop_loss:.2f}",
                         f"3. 目標價 {target:.2f}",
-                        "4. 定期檢視技術指標"
-                    ]
+                        "4. 定期檢視技術指標",
+                    ],
                 }
             elif action in ["sell", "sell_light"]:
                 plan = {
@@ -446,8 +486,8 @@ class StockAnalyst:
                     "steps": [
                         f"1. 在 {latest_price:.2f} 附近分批賣出",
                         f"2. 若反彈至 {latest_price * 1.02:.2f} 考慮加碼賣出",
-                        "3. 觀望後再決定是否回補"
-                    ]
+                        "3. 觀望後再決定是否回補",
+                    ],
                 }
             else:
                 plan = {
@@ -459,8 +499,8 @@ class StockAnalyst:
                     "steps": [
                         "1. 維持現有部位",
                         "2. 設定提醒價格",
-                        "3. 等待明確訊號再行動"
-                    ]
+                        "3. 等待明確訊號再行動",
+                    ],
                 }
 
             return plan
@@ -474,12 +514,14 @@ class StockAnalyst:
         latest_price: float,
         trend_analysis: Dict,
         recommendation: Dict,
-        risk_assessment: Dict
+        risk_assessment: Dict,
     ) -> str:
         """生成文字摘要"""
         try:
             trend = trend_analysis.get("short_term", "neutral")
-            trend_desc = "上漲" if trend == "up" else "下跌" if trend == "down" else "盤整"
+            trend_desc = (
+                "上漲" if trend == "up" else "下跌" if trend == "down" else "盤整"
+            )
 
             action = recommendation.get("action", "hold")
             action_desc = {
@@ -487,11 +529,13 @@ class StockAnalyst:
                 "buy_light": "建議輕倉買入",
                 "sell": "建議賣出",
                 "sell_light": "建議輕倉賣出",
-                "hold": "建議持有觀望"
+                "hold": "建議持有觀望",
             }.get(action, "建議觀望")
 
             risk = risk_assessment.get("level", "medium")
-            risk_desc = {"high": "高風險", "medium": "中等風險", "low": "低風險"}.get(risk, "中等風險")
+            risk_desc = {"high": "高風險", "medium": "中等風險", "low": "低風險"}.get(
+                risk, "中等風險"
+            )
 
             summary = f"""
 【{stock_id} 綜合分析報告】

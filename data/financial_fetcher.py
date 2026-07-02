@@ -2,13 +2,15 @@
 台灣股票分析工具 - 財報數據抓取模組
 資料來源：公開資訊觀測站 (MOPS) + TWSE
 """
-import requests
-import pandas as pd
+
 import json
-from typing import Dict, List, Optional, Any
-from datetime import datetime, date
-from loguru import logger
 import time
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+import requests
+from loguru import logger
 
 
 class FinancialFetcher:
@@ -20,9 +22,11 @@ class FinancialFetcher:
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+        )
         self._last_request_time = 0
         self.REQUEST_INTERVAL = 1.0  # MOPS 比較嚴格，間隔要長一點
 
@@ -37,7 +41,9 @@ class FinancialFetcher:
     #  公開資訊觀測站 (MOPS) - 財務報表
     # ──────────────────────────────────────────────
 
-    def get_income_statement(self, stock_id: str, year: int = None, quarter: int = None) -> Dict:
+    def get_income_statement(
+        self, stock_id: str, year: int = None, quarter: int = None
+    ) -> Dict:
         """
         取得損益表 (Income Statement)
 
@@ -66,7 +72,7 @@ class FinancialFetcher:
                 "off": "1",
                 "co_id": stock_id,
                 "year": str(year),
-                "season": f"0{quarter}"
+                "season": f"0{quarter}",
             }
 
             resp = self.session.post(url, data=data, timeout=15)
@@ -89,7 +95,7 @@ class FinancialFetcher:
                     "stock_id": stock_id,
                     "year": year + 1911,  # 轉換為西元年
                     "quarter": quarter,
-                    "items": {}
+                    "items": {},
                 }
 
                 for _, row in df.iterrows():
@@ -117,7 +123,9 @@ class FinancialFetcher:
             logger.error(f"取得損益表失敗: {e}")
             return self._get_mock_income_statement(stock_id)
 
-    def get_balance_sheet(self, stock_id: str, year: int = None, quarter: int = None) -> Dict:
+    def get_balance_sheet(
+        self, stock_id: str, year: int = None, quarter: int = None
+    ) -> Dict:
         """
         取得資產負債表 (Balance Sheet)
 
@@ -145,7 +153,7 @@ class FinancialFetcher:
                 "off": "1",
                 "co_id": stock_id,
                 "year": str(year),
-                "season": f"0{quarter}"
+                "season": f"0{quarter}",
             }
 
             resp = self.session.post(url, data=data, timeout=15)
@@ -164,7 +172,7 @@ class FinancialFetcher:
                     "stock_id": stock_id,
                     "year": year + 1911,
                     "quarter": quarter,
-                    "items": {}
+                    "items": {},
                 }
 
                 for _, row in df.iterrows():
@@ -191,7 +199,9 @@ class FinancialFetcher:
             logger.error(f"取得資產負債表失敗: {e}")
             return self._get_mock_balance_sheet(stock_id)
 
-    def get_cash_flow(self, stock_id: str, year: int = None, quarter: int = None) -> Dict:
+    def get_cash_flow(
+        self, stock_id: str, year: int = None, quarter: int = None
+    ) -> Dict:
         """
         取得現金流量表 (Cash Flow Statement)
 
@@ -219,7 +229,7 @@ class FinancialFetcher:
                 "off": "1",
                 "co_id": stock_id,
                 "year": str(year),
-                "season": f"0{quarter}"
+                "season": f"0{quarter}",
             }
 
             resp = self.session.post(url, data=data, timeout=15)
@@ -238,7 +248,7 @@ class FinancialFetcher:
                     "stock_id": stock_id,
                     "year": year + 1911,
                     "quarter": quarter,
-                    "items": {}
+                    "items": {},
                 }
 
                 for _, row in df.iterrows():
@@ -293,8 +303,12 @@ class FinancialFetcher:
             net_income = items_income.get("本期淨利", 0)
 
             if revenue > 0:
-                ratios["gross_margin"] = round(gross_profit / revenue * 100, 2)  # 毛利率
-                ratios["operating_margin"] = round(operating_income / revenue * 100, 2)  # 營益率
+                ratios["gross_margin"] = round(
+                    gross_profit / revenue * 100, 2
+                )  # 毛利率
+                ratios["operating_margin"] = round(
+                    operating_income / revenue * 100, 2
+                )  # 營益率
                 ratios["net_margin"] = round(net_income / revenue * 100, 2)  # 淨利率
 
             # ── 財務結構 ──
@@ -303,20 +317,28 @@ class FinancialFetcher:
             equity = items_balance.get("權益總計", 0)
 
             if total_assets > 0:
-                ratios["debt_ratio"] = round(total_liabilities / total_assets * 100, 2)  # 負債比率
-                ratios["equity_ratio"] = round(equity / total_assets * 100, 2)  # 權益比率
+                ratios["debt_ratio"] = round(
+                    total_liabilities / total_assets * 100, 2
+                )  # 負債比率
+                ratios["equity_ratio"] = round(
+                    equity / total_assets * 100, 2
+                )  # 權益比率
 
             # ── 流動性 ──
             current_assets = items_balance.get("流動資產", 0)
             current_liabilities = items_balance.get("流動負債", 0)
 
             if current_liabilities > 0:
-                ratios["current_ratio"] = round(current_assets / current_liabilities * 100, 2)  # 流動比率
+                ratios["current_ratio"] = round(
+                    current_assets / current_liabilities * 100, 2
+                )  # 流動比率
 
             # ── 現金流 ──
             operating_cash_flow = items_cash.get("營業活動之淨現金流入（流出）", 0)
             if net_income > 0:
-                ratios["ocf_to_net_income"] = round(operating_cash_flow / net_income * 100, 2)  # 營業現金流對淨利比
+                ratios["ocf_to_net_income"] = round(
+                    operating_cash_flow / net_income * 100, 2
+                )  # 營業現金流對淨利比
 
             # ── 每股數據 ──
             # 假設股數（實際應該從資料取得）
@@ -334,15 +356,15 @@ class FinancialFetcher:
                     "revenue": revenue,
                     "gross_profit": gross_profit,
                     "operating_income": operating_income,
-                    "net_income": net_income
+                    "net_income": net_income,
                 },
                 "balance_summary": {
                     "total_assets": total_assets,
                     "total_liabilities": total_liabilities,
                     "equity": equity,
                     "current_assets": current_assets,
-                    "current_liabilities": current_liabilities
-                }
+                    "current_liabilities": current_liabilities,
+                },
             }
 
         except Exception as e:
@@ -407,9 +429,9 @@ class FinancialFetcher:
                 "業外收入": 0,
                 "稅前淨利": 0,
                 "所得稅": 0,
-                "本期淨利": 0
+                "本期淨利": 0,
             },
-            "source": "mock"
+            "source": "mock",
         }
 
     def _get_mock_balance_sheet(self, stock_id: str) -> Dict:
@@ -425,9 +447,9 @@ class FinancialFetcher:
                 "流動負債": 0,
                 "非流動負債": 0,
                 "負債總計": 0,
-                "權益總計": 0
+                "權益總計": 0,
             },
-            "source": "mock"
+            "source": "mock",
         }
 
     def _get_mock_cash_flow(self, stock_id: str) -> Dict:
@@ -440,9 +462,9 @@ class FinancialFetcher:
                 "營業活動之淨現金流入（流出）": 0,
                 "投資活動之淨現金流入（流出）": 0,
                 "籌資活動之淨現金流入（流出）": 0,
-                "本期現金及約當現金淨增（減）": 0
+                "本期現金及約當現金淨增（減）": 0,
             },
-            "source": "mock"
+            "source": "mock",
         }
 
 

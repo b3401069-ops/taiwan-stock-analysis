@@ -82,7 +82,9 @@ class TestTechnicalIndicators:
         macd_hist = macd - macd_signal
 
         # 驗證 MACD_Hist = MACD - Signal
-        np.testing.assert_allclose(macd_hist.values, (macd - macd_signal).values, atol=1e-3)
+        np.testing.assert_allclose(
+            macd_hist.values, (macd - macd_signal).values, atol=1e-3
+        )
 
     def test_bollinger_bands_order(self, df_100):
         """Bollinger Bands: upper >= middle >= lower。"""
@@ -136,7 +138,9 @@ class TestTechnicalIndicators:
         assert pd.isna(price_change.iloc[0])
 
         # 第二天應為 (close[1] - close[0]) / close[0]
-        expected = (df_100["close"].iloc[1] - df_100["close"].iloc[0]) / df_100["close"].iloc[0]
+        expected = (df_100["close"].iloc[1] - df_100["close"].iloc[0]) / df_100[
+            "close"
+        ].iloc[0]
         assert price_change.iloc[1] == pytest.approx(expected, rel=1e-3)
 
     def test_cumulative_return(self, df_100):

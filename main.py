@@ -1,24 +1,26 @@
 """
 台灣股票分析工具 - 主程式
 """
-import uvicorn
+
 import json
+import logging
 import math
+import sys
+from contextlib import asynccontextmanager
+
 import numpy as np
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
-import logging
 from loguru import logger
-import sys
-
-# 導入配置
-from config.config import get_settings
 
 # 導入API路由
 from api.routes import router as api_router
+
+# 導入配置
+from config.config import get_settings
 
 
 # 配置日誌
@@ -29,14 +31,14 @@ def setup_logging():
     logger.add(
         sys.stderr,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-        level=settings.LOG_LEVEL
+        level=settings.LOG_LEVEL,
     )
     logger.add(
         "logs/app.log",
         rotation="500 MB",
         retention="10 days",
         compression="zip",
-        level=settings.LOG_LEVEL
+        level=settings.LOG_LEVEL,
     )
 
 
@@ -45,34 +47,36 @@ async def lifespan(app: FastAPI):
     """應用生命週期管理"""
     # 啟動時執行
     logger.info("正在啟動台灣股票分析工具...")
-    
+
     # 初始化資料庫連接
     # 初始化快取連接
     # 初始化券商API連接
-    
+
     # 啟動排程服務
     from services.scheduler import get_scheduler_service
+
     scheduler = get_scheduler_service()
     scheduler.start()
-    
+
     logger.info("台灣股票分析工具啟動完成")
-    
+
     yield
-    
+
     # 關閉時執行
     logger.info("正在關閉台灣股票分析工具...")
-    
+
     # 停止排程服務
     scheduler.stop()
-    
+
     # 關閉資料庫連接
     # 關閉快取連接
-    
+
     logger.info("台灣股票分析工具已關閉")
 
 
 class NanSafeJSONResponse(JSONResponse):
     """自定義 JSON 回應，處理 NaN/Inf 值"""
+
     def render(self, content) -> bytes:
         sanitized = _sanitize_for_json(content)
         return json.dumps(
@@ -81,7 +85,7 @@ class NanSafeJSONResponse(JSONResponse):
             allow_nan=False,
             indent=None,
             separators=(",", ":"),
-            default=str
+            default=str,
         ).encode("utf-8")
 
 
@@ -106,7 +110,7 @@ def _sanitize_for_json(obj):
 def create_app() -> FastAPI:
     """創建FastAPI應用實例"""
     settings = get_settings()
-    
+
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -114,9 +118,9 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
-        default_response_class=NanSafeJSONResponse
+        default_response_class=NanSafeJSONResponse,
     )
-    
+
     # 配置CORS
     # 注意：allow_origins=["*"] 搭配 allow_credentials=True 是規格上非法且危險的組合，
     # 改為由設定檔提供明確白名單（預設僅本機）。部署時透過 CORS_ORIGINS 環境變數調整。
@@ -127,7 +131,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # 添加清理 NaN 的中間件
     @app.middleware("http")
     async def sanitize_response(request, call_next):
@@ -140,7 +144,9 @@ def create_app() -> FastAPI:
             try:
                 data = json.loads(body)
                 sanitized = _sanitize_for_json(data)
-                return NanSafeJSONResponse(content=sanitized, status_code=response.status_code)
+                return NanSafeJSONResponse(
+                    content=sanitized, status_code=response.status_code
+                )
             except (json.JSONDecodeError, UnicodeDecodeError):
                 return response
         return response
@@ -149,7 +155,9 @@ def create_app() -> FastAPI:
     #  - verify_api_key：選擇性 API 金鑰驗證（未設定 API_KEY 時自動放行）
     #  - validate_path_stock_id：在路由函式前先驗證 {stock_id}，回傳乾淨 400
     from fastapi import Depends
-    from api.security import verify_api_key, validate_path_stock_id
+
+    from api.security import validate_path_stock_id, verify_api_key
+
     app.include_router(
         api_router,
         prefix="/api/v1",
@@ -160,6 +168,7 @@ def create_app() -> FastAPI:
 
     # 掛載靜態文件
     import os
+
     static_dir = os.path.join(os.path.dirname(__file__), "static")
     if os.path.exists(static_dir):
         app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -171,9 +180,9 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "app": settings.APP_NAME,
-            "version": settings.APP_VERSION
+            "version": settings.APP_VERSION,
         }
-    
+
     # 添加前端頁面
     @app.get("/app", response_class=HTMLResponse)
     async def frontend():
@@ -183,7 +192,7 @@ def create_app() -> FastAPI:
             with open(index_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>前端文件不存在</h1>")
-    
+
     # 添加聊天頁面
     @app.get("/chat", response_class=HTMLResponse)
     async def chat_page():
@@ -193,7 +202,7 @@ def create_app() -> FastAPI:
             with open(chat_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>聊天頁面不存在</h1>")
-    
+
     # 添加測試頁面
     @app.get("/test", response_class=HTMLResponse)
     async def test_page():
@@ -203,17 +212,19 @@ def create_app() -> FastAPI:
             with open(test_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>測試頁面不存在</h1>")
-    
+
     # 添加倉位頁面
     @app.get("/portfolio", response_class=HTMLResponse)
     async def portfolio_page():
         """虛擬倉位管理頁面"""
-        portfolio_path = os.path.join(os.path.dirname(__file__), "static", "portfolio.html")
+        portfolio_path = os.path.join(
+            os.path.dirname(__file__), "static", "portfolio.html"
+        )
         if os.path.exists(portfolio_path):
             with open(portfolio_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>倉位頁面不存在</h1>")
-    
+
     # 添加報告頁面
     @app.get("/report", response_class=HTMLResponse)
     async def report_page():
@@ -223,37 +234,43 @@ def create_app() -> FastAPI:
             with open(report_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>報告頁面不存在</h1>")
-    
+
     # 添加排程頁面
     @app.get("/scheduler", response_class=HTMLResponse)
     async def scheduler_page():
         """排程管理頁面"""
-        scheduler_path = os.path.join(os.path.dirname(__file__), "static", "scheduler.html")
+        scheduler_path = os.path.join(
+            os.path.dirname(__file__), "static", "scheduler.html"
+        )
         if os.path.exists(scheduler_path):
             with open(scheduler_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>排程頁面不存在</h1>")
-    
+
     # 添加多因子選股測試頁面
     @app.get("/screener", response_class=HTMLResponse)
     async def screener_page():
         """多因子選股測試頁面"""
-        screener_path = os.path.join(os.path.dirname(__file__), "static", "screener_test.html")
+        screener_path = os.path.join(
+            os.path.dirname(__file__), "static", "screener_test.html"
+        )
         if os.path.exists(screener_path):
             with open(screener_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>多因子選股頁面不存在</h1>")
-    
+
     # 添加進階分析測試頁面
     @app.get("/advanced", response_class=HTMLResponse)
     async def advanced_page():
         """進階分析測試頁面"""
-        advanced_path = os.path.join(os.path.dirname(__file__), "static", "advanced_analysis_test.html")
+        advanced_path = os.path.join(
+            os.path.dirname(__file__), "static", "advanced_analysis_test.html"
+        )
         if os.path.exists(advanced_path):
             with open(advanced_path, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
         return HTMLResponse(content="<h1>進階分析頁面不存在</h1>")
-    
+
     # Streamlit 儀表板嵌入頁面
     @app.get("/dashboard", response_class=HTMLResponse)
     async def dashboard_page():
@@ -343,9 +360,9 @@ def create_app() -> FastAPI:
             "screener": "/screener",
             "advanced": "/advanced",
             "dashboard": "/dashboard",
-            "api": "/api/v1"
+            "api": "/api/v1",
         }
-    
+
     return app
 
 
@@ -356,37 +373,38 @@ app = create_app()
 if __name__ == "__main__":
     # 設置日誌
     setup_logging()
-    
+
     # 獲取配置
     settings = get_settings()
-    
+
     # 設定端口（避免常用端口衝突）
     port = 9999
-    
+
     # 自動開啟瀏覽器
-    import webbrowser
     import threading
-    
+    import webbrowser
+
     def open_browser():
         """延遲開啟瀏覽器"""
         import time
+
         time.sleep(2)  # 等待伺服器啟動
         webbrowser.open(f"http://localhost:{port}/app")
         logger.info(f"已開啟瀏覽器: http://localhost:{port}/app")
-    
+
     # 在背景執行緒開啟瀏覽器
     if not settings.DEBUG:  # 非 debug 模式才自動開啟
         threading.Thread(target=open_browser, daemon=True).start()
-    
+
     logger.info(f"啟動台灣股票分析工具...")
     logger.info(f"API 文件: http://localhost:{port}/docs")
     logger.info(f"前端頁面: http://localhost:{port}/app")
-    
+
     # 啟動應用
     uvicorn.run(
         "main:app",
         host=settings.HOST,
         port=port,
         reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower()
+        log_level=settings.LOG_LEVEL.lower(),
     )

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 class TestCLIWatchlist:
@@ -15,25 +16,26 @@ class TestCLIWatchlist:
         """載入空關注清單。"""
         # 建立臨時目錄和檔案
         watchlist_file = tmp_path / "watchlist.json"
-        
+
         # 模擬 load_watchlist 函數
         def load_watchlist(file_path):
             if os.path.exists(file_path):
                 with open(file_path, "r", encoding="utf-8") as f:
                     return json.load(f)
             return []
-        
+
         result = load_watchlist(str(watchlist_file))
         assert result == []
 
     def test_load_watchlist_with_data(self, watchlist_file):
         """載入有資料的關注清單。"""
+
         def load_watchlist(file_path):
             if os.path.exists(file_path):
                 with open(file_path, "r", encoding="utf-8") as f:
                     return json.load(f)
             return []
-        
+
         result = load_watchlist(watchlist_file)
         assert len(result) == 2
         assert result[0]["stock_id"] == "2330"
@@ -46,21 +48,21 @@ class TestCLIWatchlist:
             {"stock_id": "2330", "name": "台積電"},
             {"stock_id": "2317", "name": "鴻海"},
         ]
-        
+
         def save_watchlist(file_path, data):
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-        
+
         save_watchlist(str(watchlist_file), watchlist)
-        
+
         # 驗證檔案存在
         assert watchlist_file.exists()
-        
+
         # 驗證內容
         with open(watchlist_file, "r", encoding="utf-8") as f:
             loaded = json.load(f)
-        
+
         assert len(loaded) == 2
         assert loaded[0]["stock_id"] == "2330"
 
@@ -69,19 +71,19 @@ class TestCLIWatchlist:
         # 載入現有清單
         with open(watchlist_file, "r", encoding="utf-8") as f:
             watchlist = json.load(f)
-        
+
         # 新增股票
         new_stock = {"stock_id": "2454", "name": "聯發科"}
         watchlist.append(new_stock)
-        
+
         # 儲存
         with open(watchlist_file, "w", encoding="utf-8") as f:
             json.dump(watchlist, f, ensure_ascii=False, indent=2)
-        
+
         # 驗證
         with open(watchlist_file, "r", encoding="utf-8") as f:
             loaded = json.load(f)
-        
+
         assert len(loaded) == 3
         assert loaded[-1]["stock_id"] == "2454"
 
@@ -90,18 +92,18 @@ class TestCLIWatchlist:
         # 載入現有清單
         with open(watchlist_file, "r", encoding="utf-8") as f:
             watchlist = json.load(f)
-        
+
         # 移除股票
         watchlist = [s for s in watchlist if s["stock_id"] != "2330"]
-        
+
         # 儲存
         with open(watchlist_file, "w", encoding="utf-8") as f:
             json.dump(watchlist, f, ensure_ascii=False, indent=2)
-        
+
         # 驗證
         with open(watchlist_file, "r", encoding="utf-8") as f:
             loaded = json.load(f)
-        
+
         assert len(loaded) == 1
         assert loaded[0]["stock_id"] == "2317"
 
@@ -110,17 +112,17 @@ class TestCLIWatchlist:
         # 載入現有清單
         with open(watchlist_file, "r", encoding="utf-8") as f:
             watchlist = json.load(f)
-        
+
         # 嘗試新增重複股票
         duplicate_id = "2330"
         is_duplicate = any(s.get("stock_id") == duplicate_id for s in watchlist)
-        
+
         assert is_duplicate is True
-        
+
         # 嘗試新增新股票
         new_id = "2454"
         is_duplicate = any(s.get("stock_id") == new_id for s in watchlist)
-        
+
         assert is_duplicate is False
 
 
@@ -146,7 +148,7 @@ class TestCLICommandParsing:
             "status",
             "validate",
         ]
-        
+
         # 所有命令應在可用命令列表中
         for cmd in commands:
             assert cmd in commands
@@ -154,42 +156,42 @@ class TestCLICommandParsing:
     def test_stock_subcommands(self):
         """股票子命令測試。"""
         subcommands = ["info", "price", "valuation"]
-        
+
         for subcmd in subcommands:
             assert subcmd in subcommands
 
     def test_screener_subcommands(self):
         """選股子命令測試。"""
         subcommands = ["run", "weights"]
-        
+
         for subcmd in subcommands:
             assert subcmd in subcommands
 
     def test_industry_subcommands(self):
         """產業子命令測試。"""
         subcommands = ["ranking", "rotation"]
-        
+
         for subcmd in subcommands:
             assert subcmd in subcommands
 
     def test_concept_subcommands(self):
         """概念股子命令測試。"""
         subcommands = ["ranking", "hot"]
-        
+
         for subcmd in subcommands:
             assert subcmd in subcommands
 
     def test_watchlist_subcommands(self):
         """關注清單子命令測試。"""
         subcommands = ["add", "remove", "list", "sync"]
-        
+
         for subcmd in subcommands:
             assert subcmd in subcommands
 
     def test_report_subcommands(self):
         """報告子命令測試。"""
         subcommands = ["daily", "weekly", "monthly"]
-        
+
         for subcmd in subcommands:
             assert subcmd in subcommands
 
@@ -200,12 +202,12 @@ class TestCLIOutput:
     def test_json_output_format(self):
         """JSON 輸出格式測試。"""
         data = {"success": True, "data": {"stock_id": "2330.TW"}}
-        
+
         # 應能正確序列化
         json_str = json.dumps(data, ensure_ascii=False, indent=2)
         assert "success" in json_str
         assert "2330.TW" in json_str
-        
+
         # 應能正確反序列化
         loaded = json.loads(json_str)
         assert loaded["success"] is True
@@ -218,10 +220,10 @@ class TestCLIOutput:
             ["1", "2330.TW", "台積電", "0.7234"],
             ["2", "2454.TW", "聯發科", "0.6891"],
         ]
-        
+
         # 建立表格
         table = [headers] + rows
-        
+
         # 驗證結構
         assert len(table) == 3
         assert len(table[0]) == 4
@@ -235,7 +237,7 @@ class TestCLIOutput:
             "❌ API 錯誤: 500",
             "❌ 沒有篩選結果",
         ]
-        
+
         for msg in error_messages:
             assert "❌" in msg
 
@@ -246,7 +248,7 @@ class TestCLIOutput:
             "✅ 因子權重更新成功",
             "✅ 通知已發送",
         ]
-        
+
         for msg in success_messages:
             assert "✅" in msg
 
@@ -277,7 +279,23 @@ class TestCLIHelpMessages:
   validate     資料驗證
 """
         # 驗證幫助訊息包含所有命令
-        for cmd in ["stock", "screener", "industry", "concept", "ai", "market", "backtest", "watchlist", "report", "discover", "morning-routine", "notify", "sync", "status", "validate"]:
+        for cmd in [
+            "stock",
+            "screener",
+            "industry",
+            "concept",
+            "ai",
+            "market",
+            "backtest",
+            "watchlist",
+            "report",
+            "discover",
+            "morning-routine",
+            "notify",
+            "sync",
+            "status",
+            "validate",
+        ]:
             assert cmd in help_text
 
     def test_stock_help(self):

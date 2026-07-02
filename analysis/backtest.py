@@ -2,11 +2,13 @@
 台灣股票分析工具 - 回測系統 (Backtesting)
 驗證交易策略的歷史表現
 """
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Callable, Any
-from datetime import datetime, date
+
 from dataclasses import dataclass, field
+from datetime import date, datetime
+from typing import Any, Callable, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 from loguru import logger
 
 from data.data_fetcher import DataFetcher
@@ -16,8 +18,9 @@ from data.stock_data import StockData
 @dataclass
 class Trade:
     """交易記錄"""
+
     date: str
-    action: str          # "buy" or "sell"
+    action: str  # "buy" or "sell"
     price: float
     shares: int
     value: float
@@ -28,30 +31,31 @@ class Trade:
 @dataclass
 class BacktestResult:
     """回測結果"""
+
     strategy_name: str
     stock_id: str
     start_date: str
     end_date: str
     initial_capital: float
     final_capital: float
-    total_return: float          # 總報酬率 (%)
-    annual_return: float         # 年化報酬率 (%)
-    max_drawdown: float          # 最大回撤 (%)
-    max_drawdown_period: str     # 最大回撤期間
-    win_rate: float              # 勝率 (%)
-    total_trades: int            # 總交易次數
-    winning_trades: int          # 獲利交易次數
-    losing_trades: int           # 虧損交易次數
-    avg_win: float               # 平均獲利 (%)
-    avg_loss: float              # 平均虧損 (%)
-    profit_factor: float         # 獲利因子
-    sharpe_ratio: float          # 夏普比率
-    sortino_ratio: float         # 索提諾比率
-    calmar_ratio: float          # 卡瑪比率
-    trades: List[Trade]          # 交易記錄
-    equity_curve: pd.Series      # 資產曲線
-    benchmark_return: float      # 基準報酬率 (買入持有)
-    alpha: float                 # 超額報酬
+    total_return: float  # 總報酬率 (%)
+    annual_return: float  # 年化報酬率 (%)
+    max_drawdown: float  # 最大回撤 (%)
+    max_drawdown_period: str  # 最大回撤期間
+    win_rate: float  # 勝率 (%)
+    total_trades: int  # 總交易次數
+    winning_trades: int  # 獲利交易次數
+    losing_trades: int  # 虧損交易次數
+    avg_win: float  # 平均獲利 (%)
+    avg_loss: float  # 平均虧損 (%)
+    profit_factor: float  # 獲利因子
+    sharpe_ratio: float  # 夏普比率
+    sortino_ratio: float  # 索提諾比率
+    calmar_ratio: float  # 卡瑪比率
+    trades: List[Trade]  # 交易記錄
+    equity_curve: pd.Series  # 資產曲線
+    benchmark_return: float  # 基準報酬率 (買入持有)
+    alpha: float  # 超額報酬
 
     def to_dict(self) -> Dict:
         """轉換為字典（方便 JSON 序列化）"""
@@ -84,10 +88,10 @@ class BacktestResult:
                     "price": round(t.price, 2),
                     "shares": t.shares,
                     "value": round(t.value, 2),
-                    "reason": t.reason
+                    "reason": t.reason,
                 }
                 for t in self.trades[-20:]  # 只返回最後 20 筆
-            ]
+            ],
         }
 
 
@@ -111,7 +115,7 @@ class BacktestEngine:
         start_date: str = None,
         end_date: str = None,
         initial_capital: float = 1000000,
-        period: str = "2y"
+        period: str = "2y",
     ) -> BacktestResult:
         """
         執行回測
@@ -156,7 +160,7 @@ class BacktestEngine:
 
         # 執行策略
         capital = initial_capital
-        position = 0           # 持有股數
+        position = 0  # 持有股數
         shares = 0
         trades = []
         equity_curve = []
@@ -170,7 +174,7 @@ class BacktestEngine:
 
             # 準備策略輸入（使用完整 DataFrame 到當前點）
             # 策略會用 iloc[-1] 取最新值
-            current_df = df.iloc[:i+1]
+            current_df = df.iloc[: i + 1]
 
             # 呼叫策略
             signal = strategy(current_df)
@@ -191,15 +195,17 @@ class BacktestEngine:
                         buy_price = current_price
                         in_position = True
 
-                        trades.append(Trade(
-                            date=current_date,
-                            action="buy",
-                            price=current_price,
-                            shares=shares,
-                            value=cost,
-                            commission=commission,
-                            reason=f"RSI={current_df['rsi'].iloc[-1]:.1f}"
-                        ))
+                        trades.append(
+                            Trade(
+                                date=current_date,
+                                action="buy",
+                                price=current_price,
+                                shares=shares,
+                                value=cost,
+                                commission=commission,
+                                reason=f"RSI={current_df['rsi'].iloc[-1]:.1f}",
+                            )
+                        )
 
             elif signal == "sell" and in_position:
                 # 賣出：賣掉全部
@@ -212,15 +218,17 @@ class BacktestEngine:
 
                 profit_pct = (current_price - buy_price) / buy_price * 100
 
-                trades.append(Trade(
-                    date=current_date,
-                    action="sell",
-                    price=current_price,
-                    shares=position,
-                    value=revenue,
-                    commission=commission + tax,
-                    reason=f"RSI={current_df['rsi'].iloc[-1]:.1f}, 獲利={profit_pct:.1f}%"
-                ))
+                trades.append(
+                    Trade(
+                        date=current_date,
+                        action="sell",
+                        price=current_price,
+                        shares=position,
+                        value=revenue,
+                        commission=commission + tax,
+                        reason=f"RSI={current_df['rsi'].iloc[-1]:.1f}, 獲利={profit_pct:.1f}%",
+                    )
+                )
 
                 position = 0
                 shares = 0
@@ -229,25 +237,32 @@ class BacktestEngine:
 
             # 記錄資產價值
             total_equity = capital + (position * current_price)
-            equity_curve.append({
-                "date": current_date,
-                "equity": total_equity,
-                "capital": capital,
-                "position_value": position * current_price
-            })
+            equity_curve.append(
+                {
+                    "date": current_date,
+                    "equity": total_equity,
+                    "capital": capital,
+                    "position_value": position * current_price,
+                }
+            )
 
         # 計算績效指標
         equity_series = pd.Series(
-            [e["equity"] for e in equity_curve],
-            index=[e["date"] for e in equity_curve]
+            [e["equity"] for e in equity_curve], index=[e["date"] for e in equity_curve]
         )
 
-        final_capital = equity_series.iloc[-1] if not equity_series.empty else initial_capital
+        final_capital = (
+            equity_series.iloc[-1] if not equity_series.empty else initial_capital
+        )
 
         # 計算各項指標
         total_return = (final_capital - initial_capital) / initial_capital * 100
         days = len(equity_series)
-        annual_return = ((final_capital / initial_capital) ** (252 / days) - 1) * 100 if days > 0 else 0
+        annual_return = (
+            ((final_capital / initial_capital) ** (252 / days) - 1) * 100
+            if days > 0
+            else 0
+        )
 
         # 最大回撤
         peak = equity_series.expanding().max()
@@ -274,10 +289,14 @@ class BacktestEngine:
                     total_losses += abs(profit)
 
         total_trade_pairs = winning_trades + losing_trades
-        win_rate = (winning_trades / total_trade_pairs * 100) if total_trade_pairs > 0 else 0
+        win_rate = (
+            (winning_trades / total_trade_pairs * 100) if total_trade_pairs > 0 else 0
+        )
         avg_win = (total_wins / winning_trades) if winning_trades > 0 else 0
         avg_loss = (total_losses / losing_trades) if losing_trades > 0 else 0
-        profit_factor = (total_wins / total_losses) if total_losses > 0 else float("inf")
+        profit_factor = (
+            (total_wins / total_losses) if total_losses > 0 else float("inf")
+        )
 
         # 夏普比率
         returns = equity_series.pct_change().dropna()
@@ -303,7 +322,9 @@ class BacktestEngine:
         alpha = total_return - benchmark_return
 
         result = BacktestResult(
-            strategy_name=strategy.__name__ if hasattr(strategy, "__name__") else "custom",
+            strategy_name=(
+                strategy.__name__ if hasattr(strategy, "__name__") else "custom"
+            ),
             stock_id=stock_id,
             start_date=str(df.index[20].date()),
             end_date=str(df.index[-1].date()),
@@ -326,10 +347,12 @@ class BacktestEngine:
             trades=trades,
             equity_curve=equity_series,
             benchmark_return=benchmark_return,
-            alpha=alpha
+            alpha=alpha,
         )
 
-        logger.info(f"回測完成: 總報酬 {total_return:.2f}%, 最大回撤 {max_drawdown:.2f}%")
+        logger.info(
+            f"回測完成: 總報酬 {total_return:.2f}%, 最大回撤 {max_drawdown:.2f}%"
+        )
 
         return result
 
@@ -370,6 +393,7 @@ class BacktestEngine:
 # ──────────────────────────────────────────────
 #  內建策略
 # ──────────────────────────────────────────────
+
 
 def strategy_rsi_oversold(df: pd.DataFrame) -> str:
     """
@@ -496,5 +520,5 @@ STRATEGIES = {
     "macd_crossover": strategy_macd_crossover,
     "ma_crossover": strategy_ma_crossover,
     "bollinger_bounce": strategy_bollinger_bounce,
-    "combined": strategy_combined
+    "combined": strategy_combined,
 }

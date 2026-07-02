@@ -2,15 +2,27 @@
 台灣股票分析工具 - 資料庫模型定義
 使用 SQLAlchemy ORM，開發環境用 SQLite，生產環境可切換 PostgreSQL
 """
-from datetime import datetime, date
-from typing import Optional
-from sqlalchemy import (
-    create_engine, Column, Integer, String, Float, Date, DateTime,
-    ForeignKey, UniqueConstraint, Index, Text, Boolean
-)
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from loguru import logger
+
 import os
+from datetime import date, datetime
+from typing import Optional
+
+from loguru import logger
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    create_engine,
+)
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 
@@ -20,6 +32,7 @@ Base = declarative_base()
 # ──────────────────────────────────────────────
 class Stock(Base):
     """股票基本資訊"""
+
     __tablename__ = "stocks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -33,8 +46,12 @@ class Stock(Base):
 
     # 關聯
     prices = relationship("Price", back_populates="stock", cascade="all, delete-orphan")
-    institutional_records = relationship("InstitutionalInvestor", back_populates="stock", cascade="all, delete-orphan")
-    margin_records = relationship("MarginTrading", back_populates="stock", cascade="all, delete-orphan")
+    institutional_records = relationship(
+        "InstitutionalInvestor", back_populates="stock", cascade="all, delete-orphan"
+    )
+    margin_records = relationship(
+        "MarginTrading", back_populates="stock", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Stock {self.stock_id} {self.name}>"
@@ -45,6 +62,7 @@ class Stock(Base):
 # ──────────────────────────────────────────────
 class Price(Base):
     """每日收盤價格"""
+
     __tablename__ = "prices"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -76,6 +94,7 @@ class Price(Base):
 # ──────────────────────────────────────────────
 class InstitutionalInvestor(Base):
     """三大法人買賣超日報"""
+
     __tablename__ = "institutional_investors"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -114,6 +133,7 @@ class InstitutionalInvestor(Base):
 # ──────────────────────────────────────────────
 class MarginTrading(Base):
     """融資融券統計"""
+
     __tablename__ = "margin_trading"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -149,6 +169,7 @@ class MarginTrading(Base):
 # ──────────────────────────────────────────────
 class IndicatorCache(Base):
     """技術指標計算結果快取"""
+
     __tablename__ = "indicator_cache"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -169,6 +190,7 @@ class IndicatorCache(Base):
 # ──────────────────────────────────────────────
 class PredictionCache(Base):
     """ML 預測結果快取"""
+
     __tablename__ = "prediction_cache"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -6,6 +6,7 @@
 - 一旦設定 API_KEY（例如部署時的環境變數），/api/v1/* 全部端點都會要求
   相符的 X-API-Key 標頭，否則回傳 401。
 """
+
 import hmac
 from typing import Optional
 

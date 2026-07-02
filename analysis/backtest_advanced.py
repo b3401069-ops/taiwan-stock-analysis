@@ -2,15 +2,17 @@
 台灣股票分析工具 - 進階回測系統
 包含：組合回測、參數優化、停損停利、跨市場測試
 """
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Callable, Any, Tuple
+
 from datetime import datetime
 from itertools import product
-from loguru import logger
-import yfinance as yf
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from analysis.backtest import BacktestEngine, BacktestResult, Trade, STRATEGIES
+import numpy as np
+import pandas as pd
+import yfinance as yf
+from loguru import logger
+
+from analysis.backtest import STRATEGIES, BacktestEngine, BacktestResult, Trade
 
 
 class AdvancedBacktestEngine(BacktestEngine):
@@ -27,7 +29,7 @@ class AdvancedBacktestEngine(BacktestEngine):
         weights: List[float] = None,
         period: str = "2y",
         initial_capital: float = 1000000,
-        rebalance_days: int = 20
+        rebalance_days: int = 20,
     ) -> Dict:
         """
         組合策略回測
@@ -102,7 +104,7 @@ class AdvancedBacktestEngine(BacktestEngine):
             for stock_id, df in all_data.items():
                 if current_date in df.index:
                     idx = df.index.get_loc(current_date)
-                    current_df = df.iloc[:idx+1]
+                    current_df = df.iloc[: idx + 1]
                     signal = strategy(current_df)
                     signals[stock_id] = signal
 
@@ -110,11 +112,13 @@ class AdvancedBacktestEngine(BacktestEngine):
                     total_equity += positions[stock_id] * current_price
 
             # 記錄資產曲線
-            equity_curve.append({
-                "date": str(current_date.date()),
-                "equity": total_equity,
-                "capital": capital
-            })
+            equity_curve.append(
+                {
+                    "date": str(current_date.date()),
+                    "equity": total_equity,
+                    "capital": capital,
+                }
+            )
 
             # 再平衡或策略信號交易
             days_since_rebalance = i - last_rebalance
@@ -135,15 +139,17 @@ class AdvancedBacktestEngine(BacktestEngine):
                             tax = revenue * self.tax_rate
                             capital += revenue - commission - tax
 
-                            trades.append(Trade(
-                                date=str(current_date.date()),
-                                action="sell",
-                                price=price,
-                                shares=positions[stock_id],
-                                value=revenue,
-                                commission=commission + tax,
-                                reason="再平衡"
-                            ))
+                            trades.append(
+                                Trade(
+                                    date=str(current_date.date()),
+                                    action="sell",
+                                    price=price,
+                                    shares=positions[stock_id],
+                                    value=revenue,
+                                    commission=commission + tax,
+                                    reason="再平衡",
+                                )
+                            )
                             positions[stock_id] = 0
 
                 # 按權重買入
@@ -162,23 +168,26 @@ class AdvancedBacktestEngine(BacktestEngine):
                                 positions[stock_id] = shares
                                 buy_prices[stock_id] = price
 
-                                trades.append(Trade(
-                                    date=str(current_date.date()),
-                                    action="buy",
-                                    price=price,
-                                    shares=shares,
-                                    value=cost,
-                                    commission=commission,
-                                    reason=f"權重={weight:.1%}"
-                                ))
+                                trades.append(
+                                    Trade(
+                                        date=str(current_date.date()),
+                                        action="buy",
+                                        price=price,
+                                        shares=shares,
+                                        value=cost,
+                                        commission=commission,
+                                        reason=f"權重={weight:.1%}",
+                                    )
+                                )
 
         # 計算績效
         equity_series = pd.Series(
-            [e["equity"] for e in equity_curve],
-            index=[e["date"] for e in equity_curve]
+            [e["equity"] for e in equity_curve], index=[e["date"] for e in equity_curve]
         )
 
-        final_capital = equity_series.iloc[-1] if not equity_series.empty else initial_capital
+        final_capital = (
+            equity_series.iloc[-1] if not equity_series.empty else initial_capital
+        )
         total_return = (final_capital - initial_capital) / initial_capital * 100
 
         # 計算基準（等權重買入持有）
@@ -190,7 +199,9 @@ class AdvancedBacktestEngine(BacktestEngine):
         benchmark_return = np.mean(benchmark_returns) if benchmark_returns else 0
 
         return {
-            "strategy": strategy.__name__ if hasattr(strategy, "__name__") else "custom",
+            "strategy": (
+                strategy.__name__ if hasattr(strategy, "__name__") else "custom"
+            ),
             "stocks": stock_ids,
             "weights": {sid: f"{w:.1%}" for sid, w in zip(stock_ids, weights)},
             "period": f"{common_dates[60].date()} ~ {common_dates[-1].date()}",
@@ -201,7 +212,7 @@ class AdvancedBacktestEngine(BacktestEngine):
             "alpha": f"{total_return - benchmark_return:.2f}%",
             "total_trades": len(trades),
             "rebalance_count": len(trades) // (2 * len(stock_ids)),
-            "equity_curve": equity_curve[-30:]  # 最後 30 天
+            "equity_curve": equity_curve[-30:],  # 最後 30 天
         }
 
     # ──────────────────────────────────────────────
@@ -215,7 +226,7 @@ class AdvancedBacktestEngine(BacktestEngine):
         param_name: str,
         param_values: List[Any],
         period: str = "2y",
-        initial_capital: float = 1000000
+        initial_capital: float = 1000000,
     ) -> List[Dict]:
         """
         參數優化：測試不同參數值的表現
@@ -237,39 +248,44 @@ class AdvancedBacktestEngine(BacktestEngine):
         for value in param_values:
             try:
                 # 建立帶參數的策略
-                strategy = self._create_strategy_with_param(strategy_name, param_name, value)
+                strategy = self._create_strategy_with_param(
+                    strategy_name, param_name, value
+                )
 
                 result = self.run(
                     stock_id=stock_id,
                     strategy=strategy,
                     initial_capital=initial_capital,
-                    period=period
+                    period=period,
                 )
 
-                results.append({
-                    "parameter": param_name,
-                    "value": value,
-                    "total_return": result.total_return,
-                    "max_drawdown": result.max_drawdown,
-                    "win_rate": result.win_rate,
-                    "sharpe_ratio": result.sharpe_ratio,
-                    "total_trades": result.total_trades
-                })
+                results.append(
+                    {
+                        "parameter": param_name,
+                        "value": value,
+                        "total_return": result.total_return,
+                        "max_drawdown": result.max_drawdown,
+                        "win_rate": result.win_rate,
+                        "sharpe_ratio": result.sharpe_ratio,
+                        "total_trades": result.total_trades,
+                    }
+                )
             except Exception as e:
-                results.append({
-                    "parameter": param_name,
-                    "value": value,
-                    "error": str(e)
-                })
+                results.append(
+                    {"parameter": param_name, "value": value, "error": str(e)}
+                )
 
         # 按報酬率排序
         results.sort(key=lambda x: x.get("total_return", 0), reverse=True)
         return results
 
-    def _create_strategy_with_param(self, strategy_name: str, param_name: str, value: Any) -> Callable:
+    def _create_strategy_with_param(
+        self, strategy_name: str, param_name: str, value: Any
+    ) -> Callable:
         """建立帶參數的策略函數"""
 
         if strategy_name == "rsi_oversold" and param_name == "rsi_buy_threshold":
+
             def strategy(df):
                 rsi = df["rsi"].iloc[-1]
                 if rsi < value:
@@ -277,10 +293,12 @@ class AdvancedBacktestEngine(BacktestEngine):
                 elif rsi > 70:
                     return "sell"
                 return "hold"
+
             strategy.__name__ = f"rsi_buy_{value}"
             return strategy
 
         elif strategy_name == "rsi_oversold" and param_name == "rsi_sell_threshold":
+
             def strategy(df):
                 rsi = df["rsi"].iloc[-1]
                 if rsi < 30:
@@ -288,24 +306,34 @@ class AdvancedBacktestEngine(BacktestEngine):
                 elif rsi > value:
                     return "sell"
                 return "hold"
+
             strategy.__name__ = f"rsi_sell_{value}"
             return strategy
 
         elif strategy_name == "ma_crossover" and param_name == "fast_period":
+
             def strategy(df):
                 if len(df) < 2:
                     return "hold"
                 fast_ma = df["close"].rolling(value).mean()
                 slow_ma = df["ma20"]
-                if fast_ma.iloc[-1] > slow_ma.iloc[-1] and fast_ma.iloc[-2] <= slow_ma.iloc[-2]:
+                if (
+                    fast_ma.iloc[-1] > slow_ma.iloc[-1]
+                    and fast_ma.iloc[-2] <= slow_ma.iloc[-2]
+                ):
                     return "buy"
-                elif fast_ma.iloc[-1] < slow_ma.iloc[-1] and fast_ma.iloc[-2] >= slow_ma.iloc[-2]:
+                elif (
+                    fast_ma.iloc[-1] < slow_ma.iloc[-1]
+                    and fast_ma.iloc[-2] >= slow_ma.iloc[-2]
+                ):
                     return "sell"
                 return "hold"
+
             strategy.__name__ = f"ma_cross_{value}_20"
             return strategy
 
         elif strategy_name == "bollinger_bounce" and param_name == "bb_std":
+
             def strategy(df):
                 close = df["close"].iloc[-1]
                 middle = df["bb_middle"].iloc[-1]
@@ -317,6 +345,7 @@ class AdvancedBacktestEngine(BacktestEngine):
                 elif close >= upper:
                     return "sell"
                 return "hold"
+
             strategy.__name__ = f"bb_{value}std"
             return strategy
 
@@ -335,7 +364,7 @@ class AdvancedBacktestEngine(BacktestEngine):
         take_profit_pct: float = 15.0,
         trailing_stop: bool = False,
         period: str = "2y",
-        initial_capital: float = 1000000
+        initial_capital: float = 1000000,
     ) -> BacktestResult:
         """
         帶停損停利的回測
@@ -354,7 +383,9 @@ class AdvancedBacktestEngine(BacktestEngine):
         """
         import yfinance as yf
 
-        logger.info(f"停損停利回測: stop_loss={stop_loss_pct}%, take_profit={take_profit_pct}%")
+        logger.info(
+            f"停損停利回測: stop_loss={stop_loss_pct}%, take_profit={take_profit_pct}%"
+        )
 
         # 取得歷史資料
         ticker = yf.Ticker(stock_id)
@@ -382,7 +413,7 @@ class AdvancedBacktestEngine(BacktestEngine):
             current_row = df.iloc[i]
             current_price = current_row["close"]
             current_date = str(df.index[i].date())
-            current_df = df.iloc[:i+1]
+            current_df = df.iloc[: i + 1]
 
             # 更新最高價
             if in_position:
@@ -407,7 +438,9 @@ class AdvancedBacktestEngine(BacktestEngine):
 
                 # 移動停損
                 elif trailing_stop:
-                    drawdown_from_high = (current_price - highest_since_buy) / highest_since_buy * 100
+                    drawdown_from_high = (
+                        (current_price - highest_since_buy) / highest_since_buy * 100
+                    )
                     if drawdown_from_high <= stop_loss_pct and profit_pct > 0:
                         should_stop = True
                         stop_reason = f"移動停損 (從高點跌 {drawdown_from_high:.1f}%)"
@@ -421,15 +454,17 @@ class AdvancedBacktestEngine(BacktestEngine):
                 net_revenue = revenue - commission - tax
                 capital += net_revenue
 
-                trades.append(Trade(
-                    date=current_date,
-                    action="sell",
-                    price=current_price,
-                    shares=position,
-                    value=revenue,
-                    commission=commission + tax,
-                    reason=stop_reason
-                ))
+                trades.append(
+                    Trade(
+                        date=current_date,
+                        action="sell",
+                        price=current_price,
+                        shares=position,
+                        value=revenue,
+                        commission=commission + tax,
+                        reason=stop_reason,
+                    )
+                )
 
                 position = 0
                 in_position = False
@@ -441,7 +476,9 @@ class AdvancedBacktestEngine(BacktestEngine):
                 signal = strategy(current_df)
 
                 if signal == "buy" and not in_position:
-                    max_shares = int(capital / (current_price * (1 + self.commission_rate)))
+                    max_shares = int(
+                        capital / (current_price * (1 + self.commission_rate))
+                    )
                     if max_shares > 0:
                         shares = max_shares
                         cost = shares * current_price
@@ -453,15 +490,17 @@ class AdvancedBacktestEngine(BacktestEngine):
                             in_position = True
                             highest_since_buy = current_price
 
-                            trades.append(Trade(
-                                date=current_date,
-                                action="buy",
-                                price=current_price,
-                                shares=shares,
-                                value=cost,
-                                commission=commission,
-                                reason=signal
-                            ))
+                            trades.append(
+                                Trade(
+                                    date=current_date,
+                                    action="buy",
+                                    price=current_price,
+                                    shares=shares,
+                                    value=cost,
+                                    commission=commission,
+                                    reason=signal,
+                                )
+                            )
 
                 elif signal == "sell" and in_position:
                     revenue = position * current_price
@@ -470,15 +509,17 @@ class AdvancedBacktestEngine(BacktestEngine):
                     net_revenue = revenue - commission - tax
                     capital += net_revenue
 
-                    trades.append(Trade(
-                        date=current_date,
-                        action="sell",
-                        price=current_price,
-                        shares=position,
-                        value=revenue,
-                        commission=commission + tax,
-                        reason=f"策略賣出 (獲利={(current_price-buy_price)/buy_price*100:.1f}%)"
-                    ))
+                    trades.append(
+                        Trade(
+                            date=current_date,
+                            action="sell",
+                            price=current_price,
+                            shares=position,
+                            value=revenue,
+                            commission=commission + tax,
+                            reason=f"策略賣出 (獲利={(current_price-buy_price)/buy_price*100:.1f}%)",
+                        )
+                    )
 
                     position = 0
                     in_position = False
@@ -487,21 +528,23 @@ class AdvancedBacktestEngine(BacktestEngine):
 
             # 記錄資產
             total_equity = capital + (position * current_price)
-            equity_curve.append({
-                "date": current_date,
-                "equity": total_equity
-            })
+            equity_curve.append({"date": current_date, "equity": total_equity})
 
         # 計算績效
         equity_series = pd.Series(
-            [e["equity"] for e in equity_curve],
-            index=[e["date"] for e in equity_curve]
+            [e["equity"] for e in equity_curve], index=[e["date"] for e in equity_curve]
         )
 
-        final_capital = equity_series.iloc[-1] if not equity_series.empty else initial_capital
+        final_capital = (
+            equity_series.iloc[-1] if not equity_series.empty else initial_capital
+        )
         total_return = (final_capital - initial_capital) / initial_capital * 100
         days = len(equity_series)
-        annual_return = ((final_capital / initial_capital) ** (252 / days) - 1) * 100 if days > 0 else 0
+        annual_return = (
+            ((final_capital / initial_capital) ** (252 / days) - 1) * 100
+            if days > 0
+            else 0
+        )
 
         # 最大回撤
         peak = equity_series.expanding().max()
@@ -540,7 +583,7 @@ class AdvancedBacktestEngine(BacktestEngine):
             trades=trades,
             equity_curve=equity_series,
             benchmark_return=benchmark_return,
-            alpha=total_return - benchmark_return
+            alpha=total_return - benchmark_return,
         )
 
     # ──────────────────────────────────────────────
@@ -552,7 +595,7 @@ class AdvancedBacktestEngine(BacktestEngine):
         stock_ids: List[str],
         strategy: Callable,
         period: str = "2y",
-        initial_capital: float = 1000000
+        initial_capital: float = 1000000,
     ) -> List[Dict]:
         """
         跨市場回測：測試策略在不同股票的表現
@@ -575,25 +618,24 @@ class AdvancedBacktestEngine(BacktestEngine):
                     stock_id=stock_id,
                     strategy=strategy,
                     initial_capital=initial_capital,
-                    period=period
+                    period=period,
                 )
 
-                results.append({
-                    "stock_id": stock_id,
-                    "total_return": result.total_return,
-                    "annual_return": result.annual_return,
-                    "max_drawdown": result.max_drawdown,
-                    "win_rate": result.win_rate,
-                    "total_trades": result.total_trades,
-                    "sharpe_ratio": result.sharpe_ratio,
-                    "benchmark_return": result.benchmark_return,
-                    "alpha": result.alpha
-                })
+                results.append(
+                    {
+                        "stock_id": stock_id,
+                        "total_return": result.total_return,
+                        "annual_return": result.annual_return,
+                        "max_drawdown": result.max_drawdown,
+                        "win_rate": result.win_rate,
+                        "total_trades": result.total_trades,
+                        "sharpe_ratio": result.sharpe_ratio,
+                        "benchmark_return": result.benchmark_return,
+                        "alpha": result.alpha,
+                    }
+                )
             except Exception as e:
-                results.append({
-                    "stock_id": stock_id,
-                    "error": str(e)
-                })
+                results.append({"stock_id": stock_id, "error": str(e)})
 
         # 按報酬率排序
         results.sort(key=lambda x: x.get("total_return", 0), reverse=True)

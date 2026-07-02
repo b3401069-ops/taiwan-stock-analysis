@@ -1,16 +1,18 @@
 """
 台灣股票分析工具 - 配置模組
 """
+
 import os
-from typing import Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field
 from functools import lru_cache
+from typing import Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """應用配置"""
-    
+
     # 應用配置
     APP_NAME: str = "台灣股票分析工具"
     APP_VERSION: str = "1.0.0"
@@ -19,40 +21,40 @@ class Settings(BaseSettings):
     # 伺服器綁定位址：預設僅本機（127.0.0.1），較安全（API 授權預設關閉時
     # 不會直接把服務暴露到整個區網）。需跨機存取時再設 HOST=0.0.0.0。
     HOST: str = "127.0.0.1"
-    
+
     # 資料庫配置
     DATABASE_URL: str = "postgresql://username:password@localhost:5432/stock_analysis"
     REDIS_URL: str = "redis://localhost:6379/0"
-    
+
     # 券商API配置
     SHIOAJI_API_KEY: Optional[str] = None
     SHIOAJI_SECRET_KEY: Optional[str] = None
     FUBON_API_KEY: Optional[str] = None
     FUBON_SECRET_KEY: Optional[str] = None
-    
+
     # Yahoo Finance配置
     YAHOO_FINANCE_TIMEOUT: int = 30
-    
+
     # AI Agent配置
     OPENAI_API_KEY: Optional[str] = None
     DEEPSEEK_API_KEY: Optional[str] = None
-    
+
     # OpenClaw配置
     OPENCLAW_API_URL: str = "http://localhost:8000"
     OPENCLAW_API_KEY: Optional[str] = None
-    
+
     # Hermes配置
     HERMES_API_URL: str = "http://localhost:8001"
     HERMES_API_KEY: Optional[str] = None
-    
+
     # 快取配置
     CACHE_TTL: int = 3600
     CACHE_MAX_SIZE: int = 1000
-    
+
     # 資料更新頻率（秒）
     DATA_UPDATE_INTERVAL: int = 3600
     REAL_TIME_UPDATE_INTERVAL: int = 60
-    
+
     # 安全配置
     SECRET_KEY: str = "your_secret_key_here"
     API_KEY_HEADER: str = "X-API-Key"
@@ -69,7 +71,7 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list:
         """將逗號分隔的 CORS_ORIGINS 轉為清單。"""
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
-    
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -88,41 +90,29 @@ STOCK_MARKET_CONFIG = {
         "exchange": "TWSE",
         "currency": "TWD",
         "timezone": "Asia/Taipei",
-        "trading_hours": {
-            "open": "09:00",
-            "close": "13:30"
-        }
+        "trading_hours": {"open": "09:00", "close": "13:30"},
     },
     "japan": {
         "name": "日本股市",
         "exchange": "TSE",
         "currency": "JPY",
         "timezone": "Asia/Tokyo",
-        "trading_hours": {
-            "open": "09:00",
-            "close": "15:00"
-        }
+        "trading_hours": {"open": "09:00", "close": "15:00"},
     },
     "korea": {
         "name": "韓國股市",
         "exchange": "KRX",
         "currency": "KRW",
         "timezone": "Asia/Seoul",
-        "trading_hours": {
-            "open": "09:00",
-            "close": "15:30"
-        }
+        "trading_hours": {"open": "09:00", "close": "15:30"},
     },
     "usa": {
         "name": "美國股市",
         "exchange": "NYSE/NASDAQ",
         "currency": "USD",
         "timezone": "America/New_York",
-        "trading_hours": {
-            "open": "09:30",
-            "close": "16:00"
-        }
-    }
+        "trading_hours": {"open": "09:30", "close": "16:00"},
+    },
 }
 
 # 技術指標配置
@@ -130,76 +120,29 @@ TECHNICAL_INDICATORS_CONFIG = {
     "moving_averages": {
         "short_term": [5, 10, 20],
         "medium_term": [50, 100],
-        "long_term": [200]
+        "long_term": [200],
     },
-    "rsi": {
-        "period": 14,
-        "overbought": 70,
-        "oversold": 30
-    },
-    "macd": {
-        "fast_period": 12,
-        "slow_period": 26,
-        "signal_period": 9
-    },
-    "kd": {
-        "k_period": 9,
-        "d_period": 3,
-        "j_period": 3
-    },
-    "bollinger_bands": {
-        "period": 20,
-        "std_dev": 2
-    }
+    "rsi": {"period": 14, "overbought": 70, "oversold": 30},
+    "macd": {"fast_period": 12, "slow_period": 26, "signal_period": 9},
+    "kd": {"k_period": 9, "d_period": 3, "j_period": 3},
+    "bollinger_bands": {"period": 20, "std_dev": 2},
 }
 
 # 估值模型配置
 VALUATION_MODELS_CONFIG = {
-    "pe_ratio": {
-        "weight": 0.30,
-        "description": "本益比分析"
-    },
-    "pb_ratio": {
-        "weight": 0.20,
-        "description": "股價淨值比分析"
-    },
-    "dividend_yield": {
-        "weight": 0.20,
-        "description": "股利殖利率分析"
-    },
-    "ev_ebitda": {
-        "weight": 0.15,
-        "description": "企業價值/EBITDA分析"
-    },
-    "free_cash_flow_yield": {
-        "weight": 0.15,
-        "description": "自由現金流收益率分析"
-    }
+    "pe_ratio": {"weight": 0.30, "description": "本益比分析"},
+    "pb_ratio": {"weight": 0.20, "description": "股價淨值比分析"},
+    "dividend_yield": {"weight": 0.20, "description": "股利殖利率分析"},
+    "ev_ebitda": {"weight": 0.15, "description": "企業價值/EBITDA分析"},
+    "free_cash_flow_yield": {"weight": 0.15, "description": "自由現金流收益率分析"},
 }
 
 # 機器學習模型配置
 ML_MODELS_CONFIG = {
-    "arima": {
-        "order": (1, 1, 1),
-        "seasonal_order": (1, 1, 1, 12)
-    },
-    "lstm": {
-        "units": 50,
-        "epochs": 100,
-        "batch_size": 32,
-        "lookback": 60
-    },
-    "xgboost": {
-        "n_estimators": 100,
-        "max_depth": 6,
-        "learning_rate": 0.1
-    },
-    "transformer": {
-        "d_model": 64,
-        "nhead": 8,
-        "num_layers": 2,
-        "epochs": 50
-    }
+    "arima": {"order": (1, 1, 1), "seasonal_order": (1, 1, 1, 12)},
+    "lstm": {"units": 50, "epochs": 100, "batch_size": 32, "lookback": 60},
+    "xgboost": {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1},
+    "transformer": {"d_model": 64, "nhead": 8, "num_layers": 2, "epochs": 50},
 }
 
 # 產業分類配置
@@ -211,24 +154,12 @@ INDUSTRY_CLASSIFICATION = {
     "healthcare": ["生技醫療", "製藥", "醫療器材"],
     "energy": ["油電燃氣", "能源", "綠能"],
     "real_estate": ["營建", "不動產"],
-    "telecom": ["電信", "通信網路"]
+    "telecom": ["電信", "通信網路"],
 }
 
 # 風險評估配置
 RISK_ASSESSMENT_CONFIG = {
-    "volatility_thresholds": {
-        "low": 0.2,
-        "medium": 0.4,
-        "high": 0.6
-    },
-    "beta_thresholds": {
-        "defensive": 0.8,
-        "neutral": 1.0,
-        "aggressive": 1.2
-    },
-    "liquidity_thresholds": {
-        "low": 1000000,
-        "medium": 5000000,
-        "high": 10000000
-    }
+    "volatility_thresholds": {"low": 0.2, "medium": 0.4, "high": 0.6},
+    "beta_thresholds": {"defensive": 0.8, "neutral": 1.0, "aggressive": 1.2},
+    "liquidity_thresholds": {"low": 1000000, "medium": 5000000, "high": 10000000},
 }

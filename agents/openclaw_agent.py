@@ -2,11 +2,14 @@
 台灣股票分析工具 - OpenClaw Agent整合模組
 整合富邦證券 SDK 服務，提供完整的股票分析功能
 """
-import requests
+
 import json
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
-from typing import Dict, List, Optional, Any
+import requests
 from loguru import logger
+
 from config.config import get_settings
 
 
@@ -27,22 +30,19 @@ class OpenClawAgent:
             # 構建請求
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}"
+                "Authorization": f"Bearer {self.api_key}",
             }
 
             payload = {
                 "message": message,
                 "context": "stock_analysis",
                 "model": "gpt-4",
-                "temperature": 0.7
+                "temperature": 0.7,
             }
 
             # 發送請求
             response = requests.post(
-                f"{self.api_url}/chat",
-                headers=headers,
-                json=payload,
-                timeout=30
+                f"{self.api_url}/chat", headers=headers, json=payload, timeout=30
             )
 
             if response.status_code == 200:
@@ -52,7 +52,7 @@ class OpenClawAgent:
                     "response": result.get("response", ""),
                     "model": result.get("model", "gpt-4"),
                     "usage": result.get("usage", {}),
-                    "timestamp": result.get("timestamp", "")
+                    "timestamp": result.get("timestamp", ""),
                 }
             else:
                 # 如果API調用失敗，返回模擬回應
@@ -94,7 +94,7 @@ class OpenClawAgent:
                 "model": response.get("model", "gpt-4"),
                 "analysis": response.get("response", ""),
                 "fubon_data": fubon_data,
-                "confidence": 0.85
+                "confidence": 0.85,
             }
 
             return analysis
@@ -108,8 +108,7 @@ class OpenClawAgent:
         try:
             # 呼叫富邦服務 API
             response = requests.get(
-                f"{self.fubon_service_url}/comprehensive/{stock_id}",
-                timeout=10
+                f"{self.fubon_service_url}/comprehensive/{stock_id}", timeout=10
             )
 
             if response.status_code == 200:
@@ -160,8 +159,7 @@ class OpenClawAgent:
         """取得即時報價"""
         try:
             response = requests.get(
-                f"{self.fubon_service_url}/quote/{stock_id}",
-                timeout=5
+                f"{self.fubon_service_url}/quote/{stock_id}", timeout=5
             )
             return response.json()
         except Exception as e:
@@ -174,7 +172,7 @@ class OpenClawAgent:
             # 取得財報數據
             response = requests.get(
                 f"{self.fubon_service_url}/financial/{stock_id}?report_type=ratios",
-                timeout=10
+                timeout=10,
             )
             financial_data = response.json()
 
@@ -197,7 +195,7 @@ class OpenClawAgent:
                 "stock_id": stock_id,
                 "financial_data": financial_data.get("data", {}),
                 "analysis": analysis.get("response", ""),
-                "timestamp": pd.Timestamp.now().isoformat()
+                "timestamp": pd.Timestamp.now().isoformat(),
             }
 
         except Exception as e:
@@ -209,15 +207,13 @@ class OpenClawAgent:
         try:
             # 取得法人數據
             inst_response = requests.get(
-                f"{self.fubon_service_url}/institutional/{stock_id}",
-                timeout=10
+                f"{self.fubon_service_url}/institutional/{stock_id}", timeout=10
             )
             inst_data = inst_response.json()
 
             # 取得融資融券數據
             margin_response = requests.get(
-                f"{self.fubon_service_url}/margin/{stock_id}",
-                timeout=10
+                f"{self.fubon_service_url}/margin/{stock_id}", timeout=10
             )
             margin_data = margin_response.json()
 
@@ -245,7 +241,7 @@ class OpenClawAgent:
                 "institutional_data": inst_data.get("data", {}),
                 "margin_data": margin_data.get("data", {}),
                 "analysis": analysis.get("response", ""),
-                "timestamp": pd.Timestamp.now().isoformat()
+                "timestamp": pd.Timestamp.now().isoformat(),
             }
 
         except Exception as e:
@@ -259,7 +255,9 @@ class OpenClawAgent:
             if "股票" in message or "分析" in message:
                 response = "這是一個股票分析的模擬回應。在實際應用中，這裡會連接到OpenClaw Agent API，使用GPT-4模型進行智能分析。"
             elif "建議" in message:
-                response = "這是一個投資建議的模擬回應。請注意，所有投資都有風險，請謹慎評估。"
+                response = (
+                    "這是一個投資建議的模擬回應。請注意，所有投資都有風險，請謹慎評估。"
+                )
             else:
                 response = "這是一個通用的模擬回應。OpenClaw Agent可以幫助您分析股票市場和提供投資建議。"
 
@@ -270,9 +268,9 @@ class OpenClawAgent:
                 "usage": {
                     "prompt_tokens": len(message),
                     "completion_tokens": len(response),
-                    "total_tokens": len(message) + len(response)
+                    "total_tokens": len(message) + len(response),
                 },
-                "timestamp": pd.Timestamp.now().isoformat()
+                "timestamp": pd.Timestamp.now().isoformat(),
             }
 
         except Exception as e:

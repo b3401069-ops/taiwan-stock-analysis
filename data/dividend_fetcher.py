@@ -3,13 +3,15 @@
 從 TWSE 取得完整除權息資料，計算填息率
 資料來源：TWSE OpenAPI（免費）
 """
-import requests
-import pandas as pd
-import numpy as np
+
 import json
 import time
-from typing import Dict, List, Optional, Any
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
+import requests
 from loguru import logger
 
 
@@ -23,9 +25,11 @@ class DividendFetcher:
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+        )
         self._last_request_time = 0
         self.REQUEST_INTERVAL = 0.5
 
@@ -64,19 +68,15 @@ class DividendFetcher:
                 "data": {
                     "stock_id": stock_id,
                     "timestamp": datetime.now().isoformat(),
-
                     # 除權息預報
                     "upcoming": dividend_schedule,
-
                     # 歷史除權息
                     "history": historical_dividend,
-
                     # 填息分析
                     "fill_analysis": fill_rate,
-
                     # 統計資料
-                    "statistics": self._calculate_statistics(historical_dividend)
-                }
+                    "statistics": self._calculate_statistics(historical_dividend),
+                },
             }
 
             return result
@@ -107,17 +107,19 @@ class DividendFetcher:
                 for item in data:
                     code = item.get("SecuritiesCompanyCode", "")
                     if code == stock_id:
-                        target_data.append({
-                            "stock_id": code,
-                            "name": item.get("CompanyName", ""),
-                            "ex_dividend_date": item.get("ExDividendDate", ""),
-                            "ex_right_date": item.get("ExRightsDate", ""),
-                            "cash_dividend": float(item.get("CashDividend", 0)),
-                            "stock_dividend": float(item.get("StockDividend", 0)),
-                            "announcement_date": item.get("AnnouncementDate", ""),
-                            "record_date": item.get("RecordDate", ""),
-                            "payment_date": item.get("PaymentDate", "")
-                        })
+                        target_data.append(
+                            {
+                                "stock_id": code,
+                                "name": item.get("CompanyName", ""),
+                                "ex_dividend_date": item.get("ExDividendDate", ""),
+                                "ex_right_date": item.get("ExRightsDate", ""),
+                                "cash_dividend": float(item.get("CashDividend", 0)),
+                                "stock_dividend": float(item.get("StockDividend", 0)),
+                                "announcement_date": item.get("AnnouncementDate", ""),
+                                "record_date": item.get("RecordDate", ""),
+                                "payment_date": item.get("PaymentDate", ""),
+                            }
+                        )
 
                 return target_data
 
@@ -158,15 +160,25 @@ class DividendFetcher:
                             try:
                                 year = int(ex_date.split("/")[0]) + 1911  # 民國轉西元
                                 if year >= cutoff_year:
-                                    target_data.append({
-                                        "stock_id": code,
-                                        "ex_date": ex_date,
-                                        "year": year,
-                                        "cash_dividend": float(item.get("CashDividend", 0)),
-                                        "stock_dividend": float(item.get("StockDividend", 0)),
-                                        "total_dividend": float(item.get("TotalDividend", 0)),
-                                        "reference_price": float(item.get("ReferencePrice", 0))
-                                    })
+                                    target_data.append(
+                                        {
+                                            "stock_id": code,
+                                            "ex_date": ex_date,
+                                            "year": year,
+                                            "cash_dividend": float(
+                                                item.get("CashDividend", 0)
+                                            ),
+                                            "stock_dividend": float(
+                                                item.get("StockDividend", 0)
+                                            ),
+                                            "total_dividend": float(
+                                                item.get("TotalDividend", 0)
+                                            ),
+                                            "reference_price": float(
+                                                item.get("ReferencePrice", 0)
+                                            ),
+                                        }
+                                    )
                             except (ValueError, IndexError):
                                 continue
 
@@ -181,7 +193,9 @@ class DividendFetcher:
             logger.error(f"取得歷史除權息失敗: {e}")
             return self._get_mock_history(stock_id, years)
 
-    def _calculate_fill_rate(self, stock_id: str, historical_dividend: List[Dict]) -> Dict:
+    def _calculate_fill_rate(
+        self, stock_id: str, historical_dividend: List[Dict]
+    ) -> Dict:
         """計算填息率"""
         try:
             import yfinance as yf
@@ -240,15 +254,17 @@ class DividendFetcher:
                             fill_days = i + 1
                             break
 
-                    fill_results.append({
-                        "ex_date": ex_date_str,
-                        "cash_dividend": cash_div,
-                        "pre_ex_price": round(pre_price, 2),
-                        "target_price": round(target_price, 2),
-                        "filled": filled,
-                        "fill_days": fill_days,
-                        "fill_status": "已填息" if filled else "未填息"
-                    })
+                    fill_results.append(
+                        {
+                            "ex_date": ex_date_str,
+                            "cash_dividend": cash_div,
+                            "pre_ex_price": round(pre_price, 2),
+                            "target_price": round(target_price, 2),
+                            "filled": filled,
+                            "fill_days": fill_days,
+                            "fill_status": "已填息" if filled else "未填息",
+                        }
+                    )
 
                     if filled:
                         filled_count += 1
@@ -261,7 +277,9 @@ class DividendFetcher:
             # 統計
             total = len(fill_results)
             fill_rate = (filled_count / total * 100) if total > 0 else 0
-            avg_fill_days = (total_fill_days / filled_count) if filled_count > 0 else None
+            avg_fill_days = (
+                (total_fill_days / filled_count) if filled_count > 0 else None
+            )
 
             return {
                 "fill_results": fill_results,
@@ -269,7 +287,7 @@ class DividendFetcher:
                 "filled_count": filled_count,
                 "fill_rate": round(fill_rate, 1),
                 "avg_fill_days": avg_fill_days,
-                "fill_rating": self._get_fill_rating(fill_rate, avg_fill_days)
+                "fill_rating": self._get_fill_rating(fill_rate, avg_fill_days),
             }
 
         except Exception as e:
@@ -292,7 +310,11 @@ class DividendFetcher:
         if not historical_dividend:
             return {}
 
-        cash_dividends = [d.get("cash_dividend", 0) for d in historical_dividend if d.get("cash_dividend", 0) > 0]
+        cash_dividends = [
+            d.get("cash_dividend", 0)
+            for d in historical_dividend
+            if d.get("cash_dividend", 0) > 0
+        ]
 
         if not cash_dividends:
             return {}
@@ -304,7 +326,7 @@ class DividendFetcher:
             "min_cash_dividend": round(min(cash_dividends), 2),
             "dividend_stability": self._calculate_stability(cash_dividends),
             "consecutive_years": self._count_consecutive_years(historical_dividend),
-            "dividend_trend": self._calculate_trend(cash_dividends)
+            "dividend_trend": self._calculate_trend(cash_dividends),
         }
 
     def _calculate_stability(self, dividends: List[float]) -> str:
@@ -329,7 +351,9 @@ class DividendFetcher:
             return 0
 
         # 按年份排序
-        sorted_div = sorted(historical_dividend, key=lambda x: x.get("year", 0), reverse=True)
+        sorted_div = sorted(
+            historical_dividend, key=lambda x: x.get("year", 0), reverse=True
+        )
 
         consecutive = 0
         current_year = datetime.now().year
@@ -364,25 +388,29 @@ class DividendFetcher:
 
     def _get_mock_schedule(self, stock_id: str) -> List[Dict]:
         """模擬除權息預報"""
-        return [{
-            "stock_id": stock_id,
-            "name": "模擬資料",
-            "ex_dividend_date": "2024/06/15",
-            "cash_dividend": 0,
-            "stock_dividend": 0,
-            "source": "mock"
-        }]
+        return [
+            {
+                "stock_id": stock_id,
+                "name": "模擬資料",
+                "ex_dividend_date": "2024/06/15",
+                "cash_dividend": 0,
+                "stock_dividend": 0,
+                "source": "mock",
+            }
+        ]
 
     def _get_mock_history(self, stock_id: str, years: int) -> List[Dict]:
         """模擬歷史除權息"""
-        return [{
-            "stock_id": stock_id,
-            "ex_date": f"{datetime.now().year - 1}/06/15",
-            "year": datetime.now().year - 1,
-            "cash_dividend": 0,
-            "stock_dividend": 0,
-            "source": "mock"
-        }]
+        return [
+            {
+                "stock_id": stock_id,
+                "ex_date": f"{datetime.now().year - 1}/06/15",
+                "year": datetime.now().year - 1,
+                "cash_dividend": 0,
+                "stock_dividend": 0,
+                "source": "mock",
+            }
+        ]
 
 
 # 全局實例

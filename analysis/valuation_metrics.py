@@ -3,12 +3,14 @@
 自動計算 PE、PB、股利殖利率等估值指標
 資料來源：Yahoo Finance（免費）
 """
-import pandas as pd
+
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-from typing import Dict, List, Optional, Any
-from datetime import datetime, date, timedelta
-from loguru import logger
+import pandas as pd
 import yfinance as yf
+from loguru import logger
 
 
 def convert_numpy_types(obj):
@@ -63,28 +65,25 @@ class ValuationMetrics:
             valuation = {
                 "stock_id": stock_id,
                 "timestamp": datetime.now().isoformat(),
-                "current_price": info.get("currentPrice", info.get("regularMarketPrice", 0)),
-
+                "current_price": info.get(
+                    "currentPrice", info.get("regularMarketPrice", 0)
+                ),
                 # 基本估值
                 "pe_ratio": self._calculate_pe(info, financials),
                 "pb_ratio": self._calculate_pb(info, balance_sheet),
                 "dividend_yield": self._calculate_dividend_yield(info),
                 "ps_ratio": self._calculate_ps(info),
-
                 # 進階估值
                 "ev_ebitda": self._calculate_ev_ebitda(info),
                 "peg_ratio": self._calculate_peg(info),
                 "free_cash_flow_yield": self._calculate_fcf_yield(info),
-
                 # 歷史估值
                 "historical_pe": self._get_historical_pe(stock_id, history, financials),
                 "valuation_range": self._calculate_valuation_range(stock_id),
-
                 # 股利資訊
                 "dividend_info": self._get_dividend_info(ticker, info),
-
                 # 估值評級
-                "valuation_rating": None  # 稍後計算
+                "valuation_rating": None,  # 稍後計算
             }
 
             # 計算估值評級
@@ -127,7 +126,9 @@ class ValuationMetrics:
                 "forward_pe": round(forward_pe, 2) if forward_pe else None,
                 "historical_avg_pe": round(avg_pe, 2) if avg_pe else None,
                 "pe_percentile": self._calculate_percentile(trailing_pe, historical_pe),
-                "is_undervalued": trailing_pe < avg_pe * 0.8 if trailing_pe and avg_pe else None
+                "is_undervalued": (
+                    trailing_pe < avg_pe * 0.8 if trailing_pe and avg_pe else None
+                ),
             }
         except Exception as e:
             logger.warning(f"計算 PE 失敗: {e}")
@@ -159,7 +160,9 @@ class ValuationMetrics:
                 "book_value_per_share": round(book_value, 2) if book_value else None,
                 "historical_avg_pb": round(avg_pb, 2) if avg_pb else None,
                 "pb_percentile": self._calculate_percentile(pb_ratio, historical_pb),
-                "is_undervalued": pb_ratio < avg_pb * 0.8 if pb_ratio and avg_pb else None
+                "is_undervalued": (
+                    pb_ratio < avg_pb * 0.8 if pb_ratio and avg_pb else None
+                ),
             }
         except Exception as e:
             logger.warning(f"計算 PB 失敗: {e}")
@@ -173,10 +176,14 @@ class ValuationMetrics:
             payout_ratio = info.get("payoutRatio", 0)
 
             return {
-                "dividend_yield": round(dividend_yield * 100, 2) if dividend_yield else None,
+                "dividend_yield": (
+                    round(dividend_yield * 100, 2) if dividend_yield else None
+                ),
                 "dividend_rate": round(dividend_rate, 2) if dividend_rate else None,
                 "payout_ratio": round(payout_ratio * 100, 2) if payout_ratio else None,
-                "is_high_yield": dividend_yield > 0.05 if dividend_yield else None  # > 5%
+                "is_high_yield": (
+                    dividend_yield > 0.05 if dividend_yield else None
+                ),  # > 5%
             }
         except Exception as e:
             logger.warning(f"計算股利殖利率失敗: {e}")
@@ -186,9 +193,7 @@ class ValuationMetrics:
         """計算股價營收比 (PS Ratio)"""
         try:
             ps_ratio = info.get("priceToSalesTrailing12Months", 0)
-            return {
-                "ps_ratio": round(ps_ratio, 2) if ps_ratio else None
-            }
+            return {"ps_ratio": round(ps_ratio, 2) if ps_ratio else None}
         except Exception:
             return {"ps_ratio": None}
 
@@ -200,7 +205,7 @@ class ValuationMetrics:
 
             return {
                 "ev_ebitda": round(ev_ebitda, 2) if ev_ebitda else None,
-                "ev_revenue": round(ev_revenue, 2) if ev_revenue else None
+                "ev_revenue": round(ev_revenue, 2) if ev_revenue else None,
             }
         except Exception:
             return {"ev_ebitda": None}
@@ -213,8 +218,10 @@ class ValuationMetrics:
 
             return {
                 "peg_ratio": round(peg_ratio, 2) if peg_ratio else None,
-                "earnings_growth": round(earnings_growth * 100, 2) if earnings_growth else None,
-                "is_undervalued": peg_ratio < 1 if peg_ratio else None
+                "earnings_growth": (
+                    round(earnings_growth * 100, 2) if earnings_growth else None
+                ),
+                "is_undervalued": peg_ratio < 1 if peg_ratio else None,
             }
         except Exception:
             return {"peg_ratio": None}
@@ -234,13 +241,15 @@ class ValuationMetrics:
                 return {
                     "fcf_yield": round(fcf_yield * 100, 2),
                     "fcf_per_share": round(fcf_per_share, 2),
-                    "is_high_yield": fcf_yield > 0.05  # > 5%
+                    "is_high_yield": fcf_yield > 0.05,  # > 5%
                 }
             return {"fcf_yield": None}
         except Exception:
             return {"fcf_yield": None}
 
-    def _get_historical_pe(self, stock_id: str, history: pd.DataFrame, financials: pd.DataFrame) -> List[Dict]:
+    def _get_historical_pe(
+        self, stock_id: str, history: pd.DataFrame, financials: pd.DataFrame
+    ) -> List[Dict]:
         """取得歷史 PE 趨勢"""
         try:
             if history.empty or financials.empty:
@@ -259,19 +268,25 @@ class ValuationMetrics:
                         # 找該季度附近的價格
                         quarter_date = quarter
                         nearby_prices = history[
-                            (history.index >= quarter_date - timedelta(days=30)) &
-                            (history.index <= quarter_date + timedelta(days=30))
+                            (history.index >= quarter_date - timedelta(days=30))
+                            & (history.index <= quarter_date + timedelta(days=30))
                         ]
 
                         if not nearby_prices.empty:
                             avg_price = nearby_prices["Close"].mean()
                             pe = avg_price / eps
 
-                            historical_pe.append({
-                                "date": str(quarter.date()) if hasattr(quarter, 'date') else str(quarter),
-                                "pe": round(pe, 2),
-                                "eps": round(eps, 2)
-                            })
+                            historical_pe.append(
+                                {
+                                    "date": (
+                                        str(quarter.date())
+                                        if hasattr(quarter, "date")
+                                        else str(quarter)
+                                    ),
+                                    "pe": round(pe, 2),
+                                    "eps": round(eps, 2),
+                                }
+                            )
 
             return historical_pe
 
@@ -300,7 +315,7 @@ class ValuationMetrics:
                     "current": round(current, 2),
                     "position_percent": round(position * 100, 1),
                     "near_high": position > 0.8,
-                    "near_low": position < 0.2
+                    "near_low": position < 0.2,
                 }
             return {}
         except Exception:
@@ -316,22 +331,25 @@ class ValuationMetrics:
                 "annual_dividend": info.get("dividendRate", 0),
                 "payout_ratio": info.get("payoutRatio", 0),
                 "ex_dividend_date": str(info.get("exDividendDate", "")),
-                "dividend_history": []
+                "dividend_history": [],
             }
 
             # 取得過去 5 年股利歷史
             if not dividends.empty:
-                yearly_dividends = dividends.resample('Y').sum()
+                yearly_dividends = dividends.resample("Y").sum()
                 for date, amount in yearly_dividends.items():
-                    dividend_info["dividend_history"].append({
-                        "year": date.year,
-                        "amount": round(float(amount), 2)
-                    })
+                    dividend_info["dividend_history"].append(
+                        {"year": date.year, "amount": round(float(amount), 2)}
+                    )
 
                 # 計算平均股利
                 if len(yearly_dividends) > 0:
-                    dividend_info["avg_annual_dividend"] = round(float(yearly_dividends.mean()), 2)
-                    dividend_info["dividend_growth"] = self._calculate_dividend_growth(yearly_dividends)
+                    dividend_info["avg_annual_dividend"] = round(
+                        float(yearly_dividends.mean()), 2
+                    )
+                    dividend_info["dividend_growth"] = self._calculate_dividend_growth(
+                        yearly_dividends
+                    )
 
             return dividend_info
 
@@ -439,7 +457,7 @@ class ValuationMetrics:
                 "rating": rating,
                 "label": label,
                 "score": score,
-                "factors": factors
+                "factors": factors,
             }
 
         except Exception as e:
