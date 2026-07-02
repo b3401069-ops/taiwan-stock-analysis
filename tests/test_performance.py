@@ -33,8 +33,10 @@ class TestLargeDataProcessing:
         assert len(data.columns) == 5
         
         # 驗證資料類型
-        assert data["close"].dtype == np.float64
-        assert data["volume"].dtype == np.int64
+        # 注意：np.random.randint 的預設整數型別因平台而異（Windows 為 int32、
+        # Linux 為 int64），故以 np.integer 做平台無關的檢查。
+        assert np.issubdtype(data["close"].dtype, np.floating)
+        assert np.issubdtype(data["volume"].dtype, np.integer)
 
     @pytest.mark.slow
     def test_technical_indicators_performance(self):
@@ -317,10 +319,13 @@ class TestScalability:
         
         # 驗證擴展性（時間應與資料量成正比）
         for i in range(1, len(times)):
+            # 計時精度不足（運算過快，耗時量測為 0）時跳過比較，避免除以零
+            if times[i - 1] == 0:
+                continue
             # 允許一定的誤差
             ratio = times[i] / times[i - 1]
             size_ratio = sizes[i] / sizes[i - 1]
-            
+
             # 時間比率應接近資料量比率
             assert ratio < size_ratio * 2, f"擴展性不佳: 時間比率 {ratio:.2f}, 資料量比率 {size_ratio:.2f}"
 
@@ -349,9 +354,12 @@ class TestScalability:
         
         # 驗證擴展性
         for i in range(1, len(times)):
+            # 計時精度不足（運算過快，耗時量測為 0）時跳過比較，避免除以零
+            if times[i - 1] == 0:
+                continue
             ratio = times[i] / times[i - 1]
             stock_ratio = stock_counts[i] / stock_counts[i - 1]
-            
+
             # 時間比率應接近股票數量比率
             assert ratio < stock_ratio * 2, f"擴展性不佳: 時間比率 {ratio:.2f}, 股票數量比率 {stock_ratio:.2f}"
 

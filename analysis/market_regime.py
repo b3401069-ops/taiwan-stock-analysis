@@ -328,8 +328,10 @@ class MarketRegimeDetector:
             elif drawdown < -0.15:
                 confidence -= 20  # 大回撤
             
-            return np.clip(confidence, 0, 100)
-            
+            # 轉為原生 int：np.clip 會回傳 numpy.int64，FastAPI 的 jsonable_encoder
+            # 無法序列化 numpy 純量，會導致 /market/regime 端點 500。
+            return int(np.clip(confidence, 0, 100))
+
         except Exception as e:
             logger.error(f"計算信心水平失敗: {e}")
             return 50
