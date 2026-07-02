@@ -118,9 +118,11 @@ def create_app() -> FastAPI:
     )
     
     # 配置CORS
+    # 注意：allow_origins=["*"] 搭配 allow_credentials=True 是規格上非法且危險的組合，
+    # 改為由設定檔提供明確白名單（預設僅本機）。部署時透過 CORS_ORIGINS 環境變數調整。
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 在生產環境中應該限制來源
+        allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -143,8 +145,18 @@ def create_app() -> FastAPI:
                 return response
         return response
 
-    # 添加API路由
-    app.include_router(api_router, prefix="/api/v1")
+    # 添加API路由：
+    #  - verify_api_key：選擇性 API 金鑰驗證（未設定 API_KEY 時自動放行）
+    #  - validate_path_stock_id：在路由函式前先驗證 {stock_id}，回傳乾淨 400
+    from fastapi import Depends
+    from api.security import verify_api_key, validate_path_stock_id
+    app.include_router(
+        api_router,
+        prefix="/api/v1",
+        dependencies=[Depends(verify_api_key), Depends(validate_path_stock_id)],
+    )
+    # 註：stock_id 的格式驗證由上方 validate_path_stock_id 於路由函式前處理並回傳 400；
+    # 此處不再掛全域 ValueError handler，以免把端點內部真正的資料錯誤也誤判為 400。
 
     # 掛載靜態文件
     import os

@@ -1596,8 +1596,14 @@ async def get_twse_stock_history(stock_id: str, months: int = Query(12, descript
 
 
 @router.post("/db/sync/{stock_id}", summary="同步股票資料到資料庫")
-async def sync_stock_to_db(stock_id: str, months: int = Query(12, description="同步月數")):
+async def sync_stock_to_db(
+    stock_id: str,
+    months: int = Query(12, ge=1, le=120, description="同步月數（1~120）"),
+):
     """從 TWSE 同步股票價格資料到本地資料庫"""
+    from utils.helpers import validate_stock_id
+    if not validate_stock_id(stock_id):
+        raise HTTPException(status_code=400, detail=f"無效的股票代碼格式: {stock_id}")
     try:
         db = get_db_manager()
         count = db.sync_stock_prices(stock_id, months)

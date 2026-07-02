@@ -53,6 +53,19 @@ class Settings(BaseSettings):
     # 安全配置
     SECRET_KEY: str = "your_secret_key_here"
     API_KEY_HEADER: str = "X-API-Key"
+    # API 存取金鑰：留空（None）時不啟用驗證，方便本機開發；
+    # 部署時設定 API_KEY 環境變數即會對 /api/v1/* 全面啟用 X-API-Key 驗證。
+    API_KEY: Optional[str] = None
+    # CORS 允許來源（逗號分隔）。預設僅本機，避免 allow_origins=["*"] 的開放風險。
+    CORS_ORIGINS: str = (
+        "http://localhost:9999,http://127.0.0.1:9999,"
+        "http://localhost:8501,http://127.0.0.1:8501"
+    )
+
+    @property
+    def cors_origin_list(self) -> list:
+        """將逗號分隔的 CORS_ORIGINS 轉為清單。"""
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
     
     class Config:
         env_file = ".env"

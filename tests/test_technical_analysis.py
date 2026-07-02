@@ -71,9 +71,10 @@ class TestTechnicalIndicators:
         assert 'lower_band' in bb
 
         # 上軌應該大於中軌，中軌應該大於下軌
+        # 注意：calculate_bollinger_bands 回傳 dict（值為 Series），需在 Series 上用 .loc
         valid_idx = bb['upper_band'].dropna().index
-        assert all(bb.loc[valid_idx, 'upper_band'] >= bb.loc[valid_idx, 'middle_band'])
-        assert all(bb.loc[valid_idx, 'middle_band'] >= bb.loc[valid_idx, 'lower_band'])
+        assert all(bb['upper_band'].loc[valid_idx] >= bb['middle_band'].loc[valid_idx])
+        assert all(bb['middle_band'].loc[valid_idx] >= bb['lower_band'].loc[valid_idx])
 
     def test_kd_calculation(self):
         """測試 KD 計算"""
