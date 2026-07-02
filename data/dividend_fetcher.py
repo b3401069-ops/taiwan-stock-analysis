@@ -5,6 +5,7 @@
 """
 import requests
 import pandas as pd
+import numpy as np
 import json
 import time
 from typing import Dict, List, Optional, Any

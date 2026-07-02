@@ -385,7 +385,7 @@ if __name__ == "__main__":
     # 啟動應用
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host=settings.HOST,
         port=port,
         reload=settings.DEBUG,
         log_level=settings.LOG_LEVEL.lower()

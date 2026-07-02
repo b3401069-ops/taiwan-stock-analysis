@@ -6,6 +6,7 @@ from typing import List, Optional
 from datetime import datetime, date
 import pandas as pd
 import schedule
+from loguru import logger
 
 # 導入服務
 from api.services import StockService, AnalysisService, RecommendationService

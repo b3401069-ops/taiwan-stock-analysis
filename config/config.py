@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
+    # 伺服器綁定位址：預設僅本機（127.0.0.1），較安全（API 授權預設關閉時
+    # 不會直接把服務暴露到整個區網）。需跨機存取時再設 HOST=0.0.0.0。
+    HOST: str = "127.0.0.1"
     
     # 資料庫配置
     DATABASE_URL: str = "postgresql://username:password@localhost:5432/stock_analysis"
