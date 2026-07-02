@@ -58,13 +58,13 @@ class TestStockEndpoints:
 
     def test_get_stock_info(self, client):
         """取得股票資訊。"""
-        response = client.get("/api/v1/stock/2330.TW")
+        response = client.get("/api/v1/stocks/2330.TW")
         # 可能需要 mock 或實際資料
         assert response.status_code in [200, 500]
 
     def test_get_stock_price(self, client):
         """取得股票價格。"""
-        response = client.get("/api/v1/price/2330.TW?period=1mo")
+        response = client.get("/api/v1/stocks/2330.TW/price?period=1mo")
         assert response.status_code in [200, 500]
 
     def test_get_stock_valuation(self, client):
@@ -188,8 +188,8 @@ class TestPortfolioEndpoints:
     """投資組合端點測試。"""
 
     def test_portfolio_positions(self, client):
-        """持倉列表。"""
-        response = client.get("/api/v1/portfolio/positions")
+        """持倉摘要。"""
+        response = client.get("/api/v1/portfolio/summary")
         assert response.status_code in [200, 500]
 
     def test_portfolio_history(self, client):
@@ -208,12 +208,12 @@ class TestReportEndpoints:
 
     def test_weekly_report(self, client):
         """每週報告。"""
-        response = client.get("/api/v1/report/weekly")
+        response = client.get("/api/v1/report/portfolio/weekly")
         assert response.status_code in [200, 500]
 
     def test_monthly_report(self, client):
         """每月報告。"""
-        response = client.get("/api/v1/report/monthly")
+        response = client.get("/api/v1/report/portfolio/monthly")
         assert response.status_code in [200, 500]
 
 
