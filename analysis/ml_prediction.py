@@ -85,9 +85,10 @@ class MLPrediction:
                 lstm_pred = self._lstm_predict(df, days)
                 xgboost_pred = self._xgboost_predict(df, days)
                 
-                prediction_result["predictions"]["ensemble"] = self._ensemble_predict([
-                    arima_pred, lstm_pred, xgboost_pred
-                ])
+                latest_price = float(df['close'].iloc[-1])
+                prediction_result["predictions"]["ensemble"] = self._ensemble_predict(
+                    [arima_pred, lstm_pred, xgboost_pred], latest_price
+                )
             
             # 計算模型性能
             prediction_result["model_performance"] = self._evaluate_model_performance(split_data)
@@ -235,54 +236,66 @@ class MLPrediction:
             logger.error(f"LSTM預測失敗: {e}，降級為趨勢外推")
             return self._trend_extrapolate(df, days, "LSTM")
     
+    def _rsi_series(self, close: pd.Series, period: int = 14) -> pd.Series:
+        """簡化 RSI（供 XGBoost 特徵使用），並處理除零。"""
+        delta = close.diff()
+        gain = delta.where(delta > 0, 0).rolling(period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+        rsi = 100 - (100 / (1 + gain / loss))
+        return rsi.replace([np.inf, -np.inf], np.nan).fillna(50)
+
+    def _build_xgb_features(self, work: pd.DataFrame) -> pd.DataFrame:
+        """建立 XGBoost 的『平穩化』特徵（報酬率、均線比值等），避免以絕對價位當特徵。"""
+        work['returns'] = work['close'].pct_change()
+        work['ma5_ratio'] = work['close'] / work['close'].rolling(5).mean()
+        work['ma10_ratio'] = work['close'] / work['close'].rolling(10).mean()
+        work['ma20_ratio'] = work['close'] / work['close'].rolling(20).mean()
+        work['volatility'] = work['returns'].rolling(10).std()
+        work['rsi'] = self._rsi_series(work['close'])
+        work['volume_ratio'] = work['volume'] / work['volume'].rolling(10).mean()
+        work['high_low_range'] = (work['high'] - work['low']) / work['close']
+        return work
+
+    # XGBoost 特徵欄位（全部為平穩/相對量，不含絕對價位）
+    _XGB_FEATURES = ['returns', 'ma5_ratio', 'ma10_ratio', 'ma20_ratio',
+                     'volatility', 'rsi', 'volume_ratio', 'high_low_range']
+
     def _xgboost_predict(self, df: pd.DataFrame, days: int) -> Dict:
-        """XGBoost 模型預測（真實實現）"""
+        """XGBoost 模型預測（真實實現）。
+
+        修正特徵洩漏：原版以絕對『收盤價』當特徵、又以次日絕對收盤價為目標，
+        模型近乎學到 identity（predicted ≈ today's price），R² 漂亮但無預測意義。
+        改為：特徵採平穩化（報酬率、均線比值…），目標為『次日報酬率』，
+        再把預測報酬率乘回價格做迭代外推。
+        """
         try:
             latest_price = float(df['close'].iloc[-1])
 
             if not (HAS_XGBOOST or HAS_SKLEARN) or len(df) < 60:
                 return self._trend_extrapolate(df, days, "XGBoost")
 
-            # 準備特徵：使用技術指標作為輸入
-            work_df = df.copy().reset_index(drop=True)
-            work_df['returns'] = work_df['close'].pct_change()
-            work_df['ma_5'] = work_df['close'].rolling(5).mean()
-            work_df['ma_10'] = work_df['close'].rolling(10).mean()
-            work_df['ma_20'] = work_df['close'].rolling(20).mean()
-            work_df['volatility'] = work_df['returns'].rolling(10).std()
-            # 簡化 RSI 計算（避免依賴 stock_data 的索引問題）
-            delta = work_df['close'].diff()
-            gain = delta.where(delta > 0, 0).rolling(14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-            work_df['rsi'] = 100 - (100 / (1 + gain / loss))
-            work_df['volume_ma'] = work_df['volume'].rolling(10).mean()
-            work_df['volume_ratio'] = work_df['volume'] / work_df['volume_ma']
-            work_df['high_low_range'] = (work_df['high'] - work_df['low']) / work_df['close']
-            work_df['target'] = work_df['close'].shift(-1)  # 預測次日收盤
+            work = self._build_xgb_features(df.copy().reset_index(drop=True))
+            # 目標：次日報酬率（而非次日絕對價位）
+            work['target_return'] = work['close'].shift(-1) / work['close'] - 1
+            work.replace([np.inf, -np.inf], np.nan, inplace=True)
+            work.dropna(inplace=True)
+            work.reset_index(drop=True, inplace=True)
 
-            work_df.dropna(inplace=True)
-            work_df.reset_index(drop=True, inplace=True)
-
-            if len(work_df) < 30:
+            if len(work) < 30:
                 return self._trend_extrapolate(df, days, "XGBoost")
 
-            feature_cols = ['open', 'high', 'low', 'close', 'volume',
-                            'returns', 'ma_5', 'ma_10', 'ma_20', 'volatility',
-                            'rsi', 'volume_ratio', 'high_low_range']
-            X = work_df[feature_cols].values
-            y = work_df['target'].values
+            feature_cols = self._XGB_FEATURES
+            X = work[feature_cols].values
+            y = work['target_return'].values
 
-            # 分割訓練/測試
             split = int(len(X) * 0.8)
             X_train, X_test = X[:split], X[split:]
             y_train, y_test = y[:split], y[split:]
 
-            # 標準化
             scaler = StandardScaler()
             X_train_s = scaler.fit_transform(X_train)
             X_test_s = scaler.transform(X_test)
 
-            # 訓練模型
             if HAS_XGBOOST:
                 model = XGBRegressor(
                     n_estimators=100, max_depth=5, learning_rate=0.1,
@@ -295,57 +308,48 @@ class MLPrediction:
 
             model.fit(X_train_s, y_train)
 
-            # 評估
+            # 以「報酬率」評估（注意：股價報酬率本就難預測，R² 偏低是正常且誠實的）
             y_pred_test = model.predict(X_test_s)
             test_rmse = float(np.sqrt(mean_squared_error(y_test, y_pred_test)))
             test_mae = float(mean_absolute_error(y_test, y_pred_test))
             test_r2 = float(r2_score(y_test, y_pred_test))
 
-            # 迭代預測未來 N 天
+            # 迭代預測未來 N 天：每天預測報酬率 → 乘回價格 → 重建特徵
             predictions = []
-            current_data = work_df.copy()
-            last_row = current_data.iloc[-1]
+            current = work.copy()
+            price = latest_price
+            base_vol = float(work['volatility'].iloc[-1])
 
             for i in range(days):
-                # 用最新一行特徵預測
-                last_features = current_data.iloc[-1:]
-                X_pred = last_features[feature_cols].values
+                X_pred = current[feature_cols].iloc[-1:].values
                 X_pred_s = scaler.transform(X_pred)
-                pred_price = float(model.predict(X_pred_s)[0])
+                pred_ret = float(model.predict(X_pred_s)[0])
+                # 限制單日預測報酬於台股漲跌幅範圍，避免迭代發散
+                pred_ret = max(-0.10, min(0.10, pred_ret))
+                price = price * (1 + pred_ret)
 
-                # 用波動率估計信心區間
-                vol = float(work_df['volatility'].iloc[-1]) * np.sqrt(i + 1)
-                lower = pred_price * (1 - 1.96 * vol)
-                upper = pred_price * (1 + 1.96 * vol)
-
+                vol = base_vol * np.sqrt(i + 1)
+                lower = price * (1 - 1.96 * vol)
+                upper = price * (1 + 1.96 * vol)
                 pred_date = (pd.Timestamp.now() + pd.Timedelta(days=i + 1)).strftime("%Y-%m-%d")
                 predictions.append({
                     "date": pred_date,
-                    "predicted_price": pred_price,
-                    "confidence_interval": {"lower": lower, "upper": upper}
+                    "predicted_price": float(max(0, price)),
+                    "confidence_interval": {"lower": float(max(0, lower)), "upper": float(upper)}
                 })
 
-                # 用預測值更新 DataFrame 以便迭代
-                new_row = current_data.iloc[-1].copy()
-                new_row['open'] = pred_price
-                new_row['high'] = pred_price * 1.01
-                new_row['low'] = pred_price * 0.99
-                new_row['close'] = pred_price
-                new_row['volume'] = current_data['volume'].iloc[-5:].mean()  # 用近5日均量
-                current_data = pd.concat([current_data, new_row.to_frame().T], ignore_index=True)
-                current_data.reset_index(drop=True, inplace=True)
-
-                # 重新計算衍生特徵
-                current_data['returns'] = current_data['close'].pct_change()
-                current_data['ma_5'] = current_data['close'].rolling(5).mean()
-                current_data['ma_10'] = current_data['close'].rolling(10).mean()
-                current_data['ma_20'] = current_data['close'].rolling(20).mean()
-                current_data['volatility'] = current_data['returns'].rolling(10).std()
-                current_data['volume_ma'] = current_data['volume'].rolling(10).mean()
-                current_data['volume_ratio'] = current_data['volume'] / current_data['volume_ma']
-                current_data['high_low_range'] = (current_data['high'] - current_data['low']) / current_data['close']
-                current_data.ffill(inplace=True)
-                current_data.bfill(inplace=True)
+                # 以預測價與近5日均量重建新的一列，再重算平穩化特徵供下一輪使用
+                new_row = current.iloc[-1].copy()
+                new_row['open'] = price
+                new_row['high'] = price * (1 + abs(pred_ret) / 2)
+                new_row['low'] = price * (1 - abs(pred_ret) / 2)
+                new_row['close'] = price
+                new_row['volume'] = current['volume'].iloc[-5:].mean()
+                current = pd.concat([current, new_row.to_frame().T], ignore_index=True)
+                current = self._build_xgb_features(current)
+                current.replace([np.inf, -np.inf], np.nan, inplace=True)
+                current.ffill(inplace=True)
+                current.bfill(inplace=True)
 
             final_price = predictions[-1]["predicted_price"]
             model_name = "XGBoost" if HAS_XGBOOST else "GradientBoosting"
@@ -356,9 +360,11 @@ class MLPrediction:
                 "trend": "up" if final_price > latest_price else "down",
                 "expected_return": (final_price - latest_price) / latest_price,
                 "model_info": {
-                    "test_rmse": test_rmse,
-                    "test_mae": test_mae,
-                    "test_r2": test_r2,
+                    "target": "next_day_return",
+                    "note": "特徵已平穩化、目標為次日報酬率，避免絕對價位造成的特徵洩漏",
+                    "test_rmse_return": test_rmse,
+                    "test_mae_return": test_mae,
+                    "test_r2_return": test_r2,
                     "training_samples": len(X_train),
                     "feature_importance": dict(zip(feature_cols, model.feature_importances_.tolist()))
                 }
@@ -369,45 +375,23 @@ class MLPrediction:
             return self._trend_extrapolate(df, days, "XGBoost")
     
     def _transformer_predict(self, df: pd.DataFrame, days: int) -> Dict:
-        """Transformer模型預測"""
-        try:
-            # 這裡應該使用Transformer模型
-            # 暫時返回示例數據
-            
-            # 獲取最新價格
-            latest_price = float(df['close'].iloc[-1])
-            
-            # 生成預測價格（示例）
-            predictions = []
-            current_price = latest_price
-            
-            for i in range(days):
-                # 模擬價格變化
-                change = np.random.normal(0, 0.022)  # 2.2%的波動率
-                current_price = current_price * (1 + change)
-                
-                predictions.append({
-                    "date": (pd.Timestamp.now() + pd.Timedelta(days=i+1)).strftime("%Y-%m-%d"),
-                    "predicted_price": float(current_price),
-                    "confidence_interval": {
-                        "lower": float(current_price * 0.94),
-                        "upper": float(current_price * 1.06)
-                    }
-                })
-            
-            return {
-                "model": "Transformer",
-                "predictions": predictions,
-                "trend": "up" if predictions[-1]["predicted_price"] > latest_price else "down",
-                "expected_return": (predictions[-1]["predicted_price"] - latest_price) / latest_price
-            }
-            
-        except Exception as e:
-            logger.error(f"Transformer預測失敗: {e}")
-            raise
+        """Transformer 模型預測（尚未實作）。
+
+        原版以 np.random.normal 產生純亂數再包裝成「Transformer 預測」，
+        每次結果不同且毫無依據，屬誤導。在真正導入 Transformer 前，
+        改為誠實地退回可重現的趨勢外推，並在 model 名稱標註未實作。
+        """
+        result = self._trend_extrapolate(df, days, "Transformer")
+        result["model"] = "Transformer (未實作，暫以趨勢外推替代)"
+        result.setdefault("model_info", {})["status"] = "not_implemented"
+        return result
     
-    def _ensemble_predict(self, predictions: List[Dict]) -> Dict:
-        """集成預測"""
+    def _ensemble_predict(self, predictions: List[Dict], latest_price: Optional[float] = None) -> Dict:
+        """集成預測。
+
+        latest_price：真實最新收盤價。用來正確計算 expected_return——
+        原版誤用「第一天的預測價」當基準，會扭曲報酬率。
+        """
         try:
             # 合併所有模型的預測
             ensemble_predictions = []
@@ -437,8 +421,9 @@ class MLPrediction:
                     "model_agreement": 1 - std / ensemble_price  # 模型一致性
                 })
             
-            # 計算總體趨勢
-            latest_price = predictions[0]["predictions"][0]["predicted_price"]  # 使用第一個預測的起始價格
+            # 計算總體趨勢（以真實現價為基準；未提供時退回第一天預測價）
+            if latest_price is None:
+                latest_price = predictions[0]["predictions"][0]["predicted_price"]
             final_price = ensemble_predictions[-1]["predicted_price"]
             
             return {

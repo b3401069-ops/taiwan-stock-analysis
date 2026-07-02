@@ -47,6 +47,10 @@ class DataFetcher:
         獲取股票價格歷史
         優先順序: 資料庫快取 → TWSE 官方 → Yahoo Finance
         """
+        # 輸入驗證：所有分析/預測端點最終都會走到這裡，於此集中把關可涵蓋整個讀取面。
+        from utils.helpers import validate_stock_id
+        if not validate_stock_id(stock_id):
+            raise ValueError(f"無效的股票代碼格式: {stock_id!r}")
         try:
             # 1. 先查資料庫快取
             try:

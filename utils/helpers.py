@@ -7,6 +7,12 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, date, timedelta
 from loguru import logger
 import json
+import re
+
+# 允許的股票代碼字元：英數、點、減號，長度 1~15。
+# 涵蓋台股（2330.TW / 6488.TWO）與國際代碼（AAPL、BRK-B 等），
+# 同時擋掉路徑穿越、過長字串與其他異常/惡意輸入。
+_STOCK_ID_PATTERN = re.compile(r"^[A-Za-z0-9.\-]{1,15}$")
 
 
 def format_currency(amount: float, currency: str = "TWD") -> str:
@@ -145,15 +151,11 @@ def calculate_max_drawdown(prices: List[float]) -> Dict:
 
 
 def validate_stock_id(stock_id: str) -> bool:
-    """驗證股票代碼格式"""
+    """驗證股票代碼格式（防止異常/惡意輸入，作為外部呼叫前的第一道防線）。"""
     try:
-        # 台灣股票代碼格式：數字.TW 或 數字.TWO
-        if stock_id.endswith(".TW") or stock_id.endswith(".TWO"):
-            code = stock_id.split(".")[0]
-            if code.isdigit() and len(code) == 4:
-                return True
-        
-        return False
+        if not stock_id or not isinstance(stock_id, str):
+            return False
+        return bool(_STOCK_ID_PATTERN.match(stock_id))
     except Exception as e:
         logger.error(f"驗證股票代碼失敗: {e}")
         return False

@@ -43,9 +43,9 @@ python main.py
 
 ### 訪問介面
 
-- **前端頁面**: http://localhost:8080/app
-- **API 文件**: http://localhost:8080/docs
-- **健康檢查**: http://localhost:8080/health
+- **前端頁面**: http://localhost:9999/app
+- **API 文件**: http://localhost:9999/docs
+- **健康檢查**: http://localhost:9999/health
 
 ## API 端點
 
@@ -76,7 +76,7 @@ python main.py
 
 | 端點 | 方法 | 說明 |
 |------|------|------|
-| `/api/v1/analysis/technical/{stock_id}` | GET | 技術分析 |
+| `/api/v1/analysis/{stock_id}/technical` | GET | 技術分析 |
 | `/api/v1/prediction/{stock_id}` | GET | ML 預測 |
 
 ## 專案結構
@@ -129,19 +129,19 @@ workspace/project/
 ### 使用 curl 取得 AI 分析
 
 ```bash
-curl "http://localhost:8080/api/v1/analysis/ai/2330.TW"
+curl "http://localhost:9999/api/v1/analysis/ai/2330.TW"
 ```
 
 ### 同步股票資料到資料庫
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/db/sync/2330.TW?months=12"
+curl -X POST "http://localhost:9999/api/v1/db/sync/2330.TW?months=12"
 ```
 
 ### 取得 TWSE 每日收盤行情
 
 ```bash
-curl "http://localhost:8080/api/v1/twse/daily"
+curl "http://localhost:9999/api/v1/twse/daily"
 ```
 
 ## 富邦證券 SDK 整合

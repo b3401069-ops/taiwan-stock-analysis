@@ -169,9 +169,14 @@ class StockData:
             # 計算最近N天的最高價和最低價
             low_min = price_data['low'].rolling(window=k_period).min()
             high_max = price_data['high'].rolling(window=k_period).max()
-            
-            # 訡算RSV
-            rsv = (price_data['close'] - low_min) / (high_max - low_min) * 100
+
+            # 計算RSV
+            # 注意：台股常見漲停/跌停整段打平（high == low），此時 high_max - low_min == 0
+            # 會產生除零 → NaN/Inf，並經下方遞迴公式往後污染整條 K/D。
+            # 因此先把分母為 0 的情況轉為 NaN，再以「前值遞補、開頭補中性值 50」處理。
+            price_range = (high_max - low_min).replace(0, np.nan)
+            rsv = (price_data['close'] - low_min) / price_range * 100
+            rsv = rsv.replace([np.inf, -np.inf], np.nan).ffill().fillna(50)
             
             # 計算K值
             k_values = pd.Series(index=price_data.index, dtype=float)
