@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch, MagicMock
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestAIStockSummary:
@@ -13,7 +14,7 @@ class TestAIStockSummary:
     def test_summary_structure(self, sample_ai_summary):
         """摘要結構測試。"""
         summary = sample_ai_summary
-        
+
         required_fields = [
             "timestamp",
             "report_type",
@@ -21,45 +22,47 @@ class TestAIStockSummary:
             "investment_advice",
             "risk_warnings",
         ]
-        
+
         for field in required_fields:
             assert field in summary
 
     def test_investment_advice_structure(self, sample_ai_summary):
         """投資建議結構測試。"""
         advice = sample_ai_summary["investment_advice"]
-        
+
         required_fields = [
             "market_advice",
             "position_size",
             "overall_strategy",
             "stock_recommendations",
         ]
-        
+
         for field in required_fields:
             assert field in advice
 
     def test_stock_recommendations_structure(self, sample_ai_summary):
         """選股推薦結構測試。"""
-        recommendations = sample_ai_summary["investment_advice"]["stock_recommendations"]
-        
+        recommendations = sample_ai_summary["investment_advice"][
+            "stock_recommendations"
+        ]
+
         assert len(recommendations) > 0
-        
+
         for rec in recommendations:
             assert "rank" in rec
             assert "stock_id" in rec
             assert "stock_name" in rec
             assert "composite_score" in rec
-            
+
             # 分數應在 0-1 之間
             assert 0 <= rec["composite_score"] <= 1
 
     def test_risk_warnings_structure(self, sample_ai_summary):
         """風險提示結構測試。"""
         warnings = sample_ai_summary["risk_warnings"]
-        
+
         assert len(warnings) > 0
-        
+
         for warning in warnings:
             assert isinstance(warning, str)
             assert len(warning) > 0
@@ -72,7 +75,7 @@ class TestAIStockSummary:
             "每月報告",
             "AI 選股摘要",
         ]
-        
+
         for report_type in report_types:
             assert isinstance(report_type, str)
             assert len(report_type) > 0
@@ -86,7 +89,7 @@ class TestAIStockSummary:
             "減碼觀望",
             "現金為王",
         ]
-        
+
         for advice in advice_options:
             assert isinstance(advice, str)
             assert len(advice) > 0
@@ -100,7 +103,7 @@ class TestAIStockSummary:
             "10-30%",
             "0-10%",
         ]
-        
+
         for position in position_options:
             assert isinstance(position, str)
             assert "%" in position
@@ -114,7 +117,7 @@ class TestAIStockSummary:
             "防禦型策略",
             "現金策略",
         ]
-        
+
         for strategy in strategy_options:
             assert isinstance(strategy, str)
             assert len(strategy) > 0
@@ -145,7 +148,7 @@ class TestAIReportGeneration:
             ],
             "risk_warnings": ["投資有風險"],
         }
-        
+
         # 驗證結構
         assert "report_type" in report
         assert "timestamp" in report
@@ -171,7 +174,7 @@ class TestAIReportGeneration:
             ],
             "next_week_outlook": "看好科技股",
         }
-        
+
         # 驗證結構
         assert "report_type" in report
         assert "market_summary" in report
@@ -197,7 +200,7 @@ class TestAIReportGeneration:
             },
             "next_month_strategy": "持續看好科技股",
         }
-        
+
         # 驗證結構
         assert "report_type" in report
         assert "monthly_summary" in report
@@ -220,7 +223,7 @@ class TestAIAnalysis:
                 "breadth_signal": "positive",
             },
         }
-        
+
         # 驗證分析結果
         assert market_state["regime"] in ["多頭", "空頭", "盤整", "危機"]
         assert 0 <= market_state["confidence"] <= 100
@@ -235,7 +238,7 @@ class TestAIAnalysis:
             "rotation_signal": "從傳統產業轉移到半導體",
             "confidence": 80,
         }
-        
+
         # 驗證分析結果
         assert "strongest_industry" in industry_analysis
         assert "weakest_industry" in industry_analysis
@@ -253,7 +256,7 @@ class TestAIAnalysis:
                 "低軌衛星": 0.78,
             },
         }
-        
+
         # 驗證分析結果
         assert "hottest_concept" in concept_analysis
         assert "trending_concepts" in concept_analysis
@@ -280,7 +283,7 @@ class TestAIAnalysis:
             "target_price": 2600.0,
             "stop_loss": 2300.0,
         }
-        
+
         # 驗證分析結果
         assert "stock_id" in stock_analysis
         assert "technical_signals" in stock_analysis
@@ -301,7 +304,7 @@ class TestAIAnalysis:
                 "利率政策變化",
             ],
         }
-        
+
         # 驗證風險評估
         assert "market_risk" in risk_assessment
         assert "sector_risk" in risk_assessment
@@ -324,7 +327,7 @@ class TestAIAnalysis:
                 "產業前景看好",
             ],
         }
-        
+
         # 驗證投資建議
         assert "action" in recommendation
         assert "confidence" in recommendation
@@ -357,7 +360,7 @@ class TestAIReportFormatting:
 • 投資有風險，請謹慎評估
 • 所有分析僅供參考
 """
-        
+
         # 驗證報告格式
         assert "📊" in report_text
         assert "📋" in report_text
@@ -370,7 +373,7 @@ class TestAIReportFormatting:
         embed = {
             "title": "📊 AI 選股摘要報告",
             "description": "市場處於多頭狀態",
-            "color": 0x00ff00,
+            "color": 0x00FF00,
             "fields": [
                 {"name": "市場建議", "value": "積極佈局", "inline": True},
                 {"name": "建議部位", "value": "70-90%", "inline": True},
@@ -378,7 +381,7 @@ class TestAIReportFormatting:
             "footer": {"text": "台灣股票分析工具"},
             "timestamp": datetime.now().isoformat(),
         }
-        
+
         # 驗證嵌入格式
         assert "title" in embed
         assert "description" in embed
@@ -400,7 +403,7 @@ class TestAIReportFormatting:
 ⭐ 選股推薦:
 1. 台積電 (2330.TW) - 分數: 0.7234
 """
-        
+
         # 驗證訊息格式
         assert "📊" in message
         assert "📋" in message

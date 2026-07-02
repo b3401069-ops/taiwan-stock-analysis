@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
-import json
-import pandas as pd
-import numpy as np
-import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pandas as pd
+import pytest
 
 # 確保專案根目錄在 Python path 中
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -61,9 +62,30 @@ def sample_price_data():
     return {
         "period": "6mo",
         "data": [
-            {"date": "2024-01-02", "open": 580.0, "high": 585.0, "low": 575.0, "close": 582.0, "volume": 25000000},
-            {"date": "2024-01-03", "open": 582.0, "high": 590.0, "low": 580.0, "close": 588.0, "volume": 28000000},
-            {"date": "2024-01-04", "open": 588.0, "high": 595.0, "low": 586.0, "close": 592.0, "volume": 30000000},
+            {
+                "date": "2024-01-02",
+                "open": 580.0,
+                "high": 585.0,
+                "low": 575.0,
+                "close": 582.0,
+                "volume": 25000000,
+            },
+            {
+                "date": "2024-01-03",
+                "open": 582.0,
+                "high": 590.0,
+                "low": 580.0,
+                "close": 588.0,
+                "volume": 28000000,
+            },
+            {
+                "date": "2024-01-04",
+                "open": 588.0,
+                "high": 595.0,
+                "low": 586.0,
+                "close": 592.0,
+                "volume": 30000000,
+            },
         ],
         "summary": {
             "start_date": "2024-01-02",
@@ -199,8 +221,18 @@ def sample_ai_summary():
             "position_size": "70-90%",
             "overall_strategy": "積極成長策略",
             "stock_recommendations": [
-                {"rank": 1, "stock_id": "2330.TW", "stock_name": "台積電", "composite_score": 0.7234},
-                {"rank": 2, "stock_id": "2454.TW", "stock_name": "聯發科", "composite_score": 0.6891},
+                {
+                    "rank": 1,
+                    "stock_id": "2330.TW",
+                    "stock_name": "台積電",
+                    "composite_score": 0.7234,
+                },
+                {
+                    "rank": 2,
+                    "stock_id": "2454.TW",
+                    "stock_name": "聯發科",
+                    "composite_score": 0.6891,
+                },
             ],
         },
         "risk_warnings": [
@@ -213,6 +245,7 @@ def sample_ai_summary():
 @pytest.fixture()
 def mock_api_response():
     """建立 mock API 回應。"""
+
     def _mock_response(success=True, data=None, error=None):
         response = Mock()
         response.status_code = 200 if success else 500
@@ -222,6 +255,7 @@ def mock_api_response():
             "error": error,
         }
         return response
+
     return _mock_response
 
 
@@ -245,8 +279,18 @@ def mock_requests_post(mock_api_response):
 def watchlist_file(tmp_path):
     """建立臨時關注清單檔案。"""
     watchlist = [
-        {"stock_id": "2330", "name": "台積電", "added_date": "2024-01-01T00:00:00", "notes": ""},
-        {"stock_id": "2317", "name": "鴻海", "added_date": "2024-01-01T00:00:00", "notes": ""},
+        {
+            "stock_id": "2330",
+            "name": "台積電",
+            "added_date": "2024-01-01T00:00:00",
+            "notes": "",
+        },
+        {
+            "stock_id": "2317",
+            "name": "鴻海",
+            "added_date": "2024-01-01T00:00:00",
+            "notes": "",
+        },
     ]
     file_path = tmp_path / "watchlist.json"
     with open(file_path, "w", encoding="utf-8") as f:
@@ -302,8 +346,20 @@ def sample_walk_forward_result():
         "avg_win_rate": "65.00%",
         "avg_sharpe_ratio": "1.23",
         "periods": [
-            {"period": 1, "return": "15.5%", "max_drawdown": "-5.2%", "win_rate": "70%", "sharpe": "1.45"},
-            {"period": 2, "return": "8.2%", "max_drawdown": "-12.1%", "win_rate": "55%", "sharpe": "0.89"},
+            {
+                "period": 1,
+                "return": "15.5%",
+                "max_drawdown": "-5.2%",
+                "win_rate": "70%",
+                "sharpe": "1.45",
+            },
+            {
+                "period": 2,
+                "return": "8.2%",
+                "max_drawdown": "-12.1%",
+                "win_rate": "55%",
+                "sharpe": "0.89",
+            },
         ],
     }
 

@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
 
 
 @pytest.fixture()
 def client():
     """建立測試客戶端。"""
     from main import app
+
     return TestClient(app)
 
 
@@ -29,8 +31,20 @@ class TestRootEndpoint:
         """根端點應返回所有頁面連結。"""
         response = client.get("/")
         data = response.json()
-        
-        expected_pages = ["docs", "health", "app", "chat", "test", "portfolio", "report", "scheduler", "screener", "advanced", "dashboard"]
+
+        expected_pages = [
+            "docs",
+            "health",
+            "app",
+            "chat",
+            "test",
+            "portfolio",
+            "report",
+            "scheduler",
+            "screener",
+            "advanced",
+            "dashboard",
+        ]
         for page in expected_pages:
             assert page in data
 
@@ -153,7 +167,7 @@ class TestBacktestEndpoints:
                 "test_window": 63,
                 "step_size": 21,
                 "total_years": 5,
-            }
+            },
         )
         assert response.status_code in [200, 500]
 

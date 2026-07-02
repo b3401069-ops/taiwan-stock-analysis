@@ -3,14 +3,15 @@
 建立產業分類，比較同業估值和財務指標
 資料來源：Yahoo Finance（免費）
 """
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-from loguru import logger
-import yfinance as yf
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
+import yfinance as yf
+from loguru import logger
 
 # ──────────────────────────────────────────────
 #  台灣主要產業分類
@@ -18,37 +19,51 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 TAIWAN_INDUSTRIES = {
     "半導體": {
-        "stocks": ["2330.TW", "2379.TW", "3034.TW", "2454.TW", "2303.TW", "3711.TW", "2327.TW", "6488.TW"],
-        "description": "IC 設計、晶圓代工、封測、設備"
+        "stocks": [
+            "2330.TW",
+            "2379.TW",
+            "3034.TW",
+            "2454.TW",
+            "2303.TW",
+            "3711.TW",
+            "2327.TW",
+            "6488.TW",
+        ],
+        "description": "IC 設計、晶圓代工、封測、設備",
     },
     "電子代工": {
         "stocks": ["2317.TW", "2382.TW", "4938.TW", "3231.TW", "2356.TW"],
-        "description": "電腦、手機、伺服器代工"
+        "description": "電腦、手機、伺服器代工",
     },
     "金融": {
-        "stocks": ["2881.TW", "2882.TW", "2884.TW", "2891.TW", "2886.TW", "2880.TW", "2892.TW"],
-        "description": "銀行、壽險、證券"
+        "stocks": [
+            "2881.TW",
+            "2882.TW",
+            "2884.TW",
+            "2891.TW",
+            "2886.TW",
+            "2880.TW",
+            "2892.TW",
+        ],
+        "description": "銀行、壽險、證券",
     },
-    "電信": {
-        "stocks": ["2412.TW", "3045.TW", "4904.TW"],
-        "description": "電信服務"
-    },
+    "電信": {"stocks": ["2412.TW", "3045.TW", "4904.TW"], "description": "電信服務"},
     "傳產": {
         "stocks": ["1301.TW", "1303.TW", "1326.TW", "2002.TW", "1101.TW", "2912.TW"],
-        "description": "塑化、鋼鐵、水泥、食品"
+        "description": "塑化、鋼鐵、水泥、食品",
     },
     "生技": {
         "stocks": ["4142.TW", "6547.TW", "3164.TW", "6535.TW", "4157.TW"],
-        "description": "製藥、醫療器材、新藥開發"
+        "description": "製藥、醫療器材、新藥開發",
     },
     "電動車": {
         "stocks": ["2345.TW", "2377.TW", "3653.TW", "6666.TW", "2207.TW"],
-        "description": "電動車相關、充電樁、電池"
+        "description": "電動車相關、充電樁、電池",
     },
     "AI 概念": {
         "stocks": ["2330.TW", "2379.TW", "3034.TW", "2454.TW", "3661.TW", "8069.TW"],
-        "description": "AI 晶片、伺服器、散熱"
-    }
+        "description": "AI 晶片、伺服器、散熱",
+    },
 }
 
 
@@ -73,10 +88,7 @@ class IndustryComparison:
             # 找出所屬產業
             industry = self._find_industry(stock_id)
             if not industry:
-                return {
-                    "success": False,
-                    "error": f"找不到 {stock_id} 的產業分類"
-                }
+                return {"success": False, "error": f"找不到 {stock_id} 的產業分類"}
 
             # 取得同業數據
             peers_data = self._get_peers_data(industry["stocks"])
@@ -97,22 +109,21 @@ class IndustryComparison:
                     "industry": industry["name"],
                     "industry_description": industry["description"],
                     "timestamp": datetime.now().isoformat(),
-
                     # 目標股票
                     "target_stock": target_data,
-
                     # 產業平均
                     "industry_average": industry_avg,
-
                     # 排名
                     "rankings": rankings,
-
                     # 同業比較
-                    "peers_comparison": self._format_peers_comparison(stock_id, peers_data, industry_avg),
-
+                    "peers_comparison": self._format_peers_comparison(
+                        stock_id, peers_data, industry_avg
+                    ),
                     # 分析結論
-                    "analysis": self._generate_analysis(stock_id, target_data, industry_avg, rankings)
-                }
+                    "analysis": self._generate_analysis(
+                        stock_id, target_data, industry_avg, rankings
+                    ),
+                },
             }
 
             return result
@@ -125,12 +136,14 @@ class IndustryComparison:
         """取得所有產業列表"""
         industries = []
         for name, info in TAIWAN_INDUSTRIES.items():
-            industries.append({
-                "name": name,
-                "description": info["description"],
-                "stock_count": len(info["stocks"]),
-                "stocks": info["stocks"]
-            })
+            industries.append(
+                {
+                    "name": name,
+                    "description": info["description"],
+                    "stock_count": len(info["stocks"]),
+                    "stocks": info["stocks"],
+                }
+            )
 
         return {"success": True, "data": industries}
 
@@ -145,8 +158,8 @@ class IndustryComparison:
             "data": {
                 "industry": industry_name,
                 "stocks": industry["stocks"],
-                "description": industry["description"]
-            }
+                "description": industry["description"],
+            },
         }
 
     def _find_industry(self, stock_id: str) -> Optional[Dict]:
@@ -171,7 +184,9 @@ class IndustryComparison:
                 data = {
                     "stock_id": stock_id,
                     "name": info.get("shortName", stock_id),
-                    "price": info.get("currentPrice", info.get("regularMarketPrice", 0)),
+                    "price": info.get(
+                        "currentPrice", info.get("regularMarketPrice", 0)
+                    ),
                     "market_cap": info.get("marketCap", 0),
                     "pe_ratio": info.get("trailingPE", 0),
                     "pb_ratio": info.get("priceToBook", 0),
@@ -181,7 +196,7 @@ class IndustryComparison:
                     "profit_margin": info.get("profitMargins", 0),
                     "roe": info.get("returnOnEquity", 0),
                     "revenue_growth": info.get("revenueGrowth", 0),
-                    "earnings_growth": info.get("earningsGrowth", 0)
+                    "earnings_growth": info.get("earningsGrowth", 0),
                 }
 
                 return stock_id, data
@@ -204,8 +219,17 @@ class IndustryComparison:
         if not peers_data:
             return {}
 
-        metrics = ["pe_ratio", "pb_ratio", "dividend_yield", "ps_ratio", "ev_ebitda",
-                    "profit_margin", "roe", "revenue_growth", "earnings_growth"]
+        metrics = [
+            "pe_ratio",
+            "pb_ratio",
+            "dividend_yield",
+            "ps_ratio",
+            "ev_ebitda",
+            "profit_margin",
+            "roe",
+            "revenue_growth",
+            "earnings_growth",
+        ]
 
         averages = {}
         for metric in metrics:
@@ -229,7 +253,7 @@ class IndustryComparison:
             "dividend_yield": "descending",  # 股利越高越好
             "roe": "descending",  # ROE 越高越好
             "profit_margin": "descending",  # 淨利率越高越好
-            "revenue_growth": "descending"  # 營收成長越高越好
+            "revenue_growth": "descending",  # 營收成長越高越好
         }
 
         for metric, order in metrics_to_rank.items():
@@ -255,32 +279,40 @@ class IndustryComparison:
                         "rank": rank,
                         "total": len(values),
                         "value": round(val, 2),
-                        "percentile": round((1 - (rank - 1) / len(values)) * 100, 1)
+                        "percentile": round((1 - (rank - 1) / len(values)) * 100, 1),
                     }
                     break
 
         return rankings
 
-    def _format_peers_comparison(self, stock_id: str, peers_data: Dict, industry_avg: Dict) -> List[Dict]:
+    def _format_peers_comparison(
+        self, stock_id: str, peers_data: Dict, industry_avg: Dict
+    ) -> List[Dict]:
         """格式化同業比較"""
         comparison = []
 
         for sid, data in peers_data.items():
-            is_target = (sid == stock_id)
-            comparison.append({
-                "stock_id": sid,
-                "name": data.get("name", sid),
-                "is_target": is_target,
-                "price": data.get("price", 0),
-                "market_cap": data.get("market_cap", 0),
-                "pe_ratio": data.get("pe_ratio", 0),
-                "pb_ratio": data.get("pb_ratio", 0),
-                "dividend_yield": data.get("dividend_yield", 0),
-                "roe": data.get("roe", 0),
-                "profit_margin": data.get("profit_margin", 0),
-                "pe_vs_industry": self._compare_to_avg(data.get("pe_ratio", 0), industry_avg.get("pe_ratio")),
-                "pb_vs_industry": self._compare_to_avg(data.get("pb_ratio", 0), industry_avg.get("pb_ratio"))
-            })
+            is_target = sid == stock_id
+            comparison.append(
+                {
+                    "stock_id": sid,
+                    "name": data.get("name", sid),
+                    "is_target": is_target,
+                    "price": data.get("price", 0),
+                    "market_cap": data.get("market_cap", 0),
+                    "pe_ratio": data.get("pe_ratio", 0),
+                    "pb_ratio": data.get("pb_ratio", 0),
+                    "dividend_yield": data.get("dividend_yield", 0),
+                    "roe": data.get("roe", 0),
+                    "profit_margin": data.get("profit_margin", 0),
+                    "pe_vs_industry": self._compare_to_avg(
+                        data.get("pe_ratio", 0), industry_avg.get("pe_ratio")
+                    ),
+                    "pb_vs_industry": self._compare_to_avg(
+                        data.get("pb_ratio", 0), industry_avg.get("pb_ratio")
+                    ),
+                }
+            )
 
         # 排序：目標股票優先
         comparison.sort(key=lambda x: (not x["is_target"], x["stock_id"]))
@@ -299,7 +331,9 @@ class IndustryComparison:
         else:
             return f"{diff:.1f}% (接近平均)"
 
-    def _generate_analysis(self, stock_id: str, target_data: Dict, industry_avg: Dict, rankings: Dict) -> Dict:
+    def _generate_analysis(
+        self, stock_id: str, target_data: Dict, industry_avg: Dict, rankings: Dict
+    ) -> Dict:
         """生成分析結論"""
         if not target_data or not industry_avg:
             return {"summary": "數據不足，無法分析"}
@@ -364,10 +398,14 @@ class IndustryComparison:
             "weaknesses": weaknesses,
             "opportunities": opportunities,
             "threats": threats,
-            "overall_rating": self._calculate_overall_rating(strengths, weaknesses, opportunities, threats)
+            "overall_rating": self._calculate_overall_rating(
+                strengths, weaknesses, opportunities, threats
+            ),
         }
 
-    def _calculate_overall_rating(self, strengths, weaknesses, opportunities, threats) -> str:
+    def _calculate_overall_rating(
+        self, strengths, weaknesses, opportunities, threats
+    ) -> str:
         """計算總體評級"""
         score = len(strengths) - len(weaknesses) + len(opportunities) - len(threats)
 

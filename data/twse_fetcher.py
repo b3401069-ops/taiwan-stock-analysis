@@ -2,13 +2,15 @@
 台灣股票分析工具 - TWSE 官方資料取得模組
 從證交所 Open API 取得免費公開資料
 """
-import requests
-import pandas as pd
-from typing import Dict, List, Optional, Any
-from datetime import datetime, date, timedelta
-from loguru import logger
-import time
+
 import json
+import time
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+import requests
+from loguru import logger
 
 
 class TWSEFetcher:
@@ -22,10 +24,12 @@ class TWSEFetcher:
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "application/json",
+            }
+        )
         self._last_request_time = 0
 
     def _throttle(self):
@@ -66,23 +70,34 @@ class TWSEFetcher:
 
         df = pd.DataFrame(data)
         # 轉換欄位類型
-        numeric_cols = ["OpeningPrice", "HighestPrice", "LowestPrice", "ClosingPrice", "Change", "TradeVolume", "TradeValue"]
+        numeric_cols = [
+            "OpeningPrice",
+            "HighestPrice",
+            "LowestPrice",
+            "ClosingPrice",
+            "Change",
+            "TradeVolume",
+            "TradeValue",
+        ]
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col].str.replace(",", ""), errors="coerce")
 
-        df.rename(columns={
-            "Code": "stock_id",
-            "Name": "name",
-            "OpeningPrice": "open",
-            "HighestPrice": "high",
-            "LowestPrice": "low",
-            "ClosingPrice": "close",
-            "Change": "change",
-            "TradeVolume": "volume",
-            "TradeValue": "trade_value",
-            "Transaction": "transactions",
-        }, inplace=True)
+        df.rename(
+            columns={
+                "Code": "stock_id",
+                "Name": "name",
+                "OpeningPrice": "open",
+                "HighestPrice": "high",
+                "LowestPrice": "low",
+                "ClosingPrice": "close",
+                "Change": "change",
+                "TradeVolume": "volume",
+                "TradeValue": "trade_value",
+                "Transaction": "transactions",
+            },
+            inplace=True,
+        )
 
         df["date"] = datetime.now().strftime("%Y-%m-%d")
         return df
@@ -102,20 +117,24 @@ class TWSEFetcher:
             return pd.DataFrame()
 
         df = pd.DataFrame(data)
-        df.rename(columns={
-            "Code": "stock_id",
-            "Name": "name",
-            "Foreign_Investor_buy": "foreign_buy",
-            "Foreign_Investor_sell": "foreign_sell",
-            "Foreign_Investor_net": "foreign_net",
-            "Investment_Trust_buy": "trust_buy",
-            "Investment_Trust_sell": "trust_sell",
-            "Investment_Trust_net": "trust_net",
-            "Dealer_self_buy": "dealer_buy",
-            "Dealer_self_sell": "dealer_sell",
-            "Dealer_self_net": "dealer_net",
-            "Total_net": "total_net",
-        }, inplace=True, errors="ignore")
+        df.rename(
+            columns={
+                "Code": "stock_id",
+                "Name": "name",
+                "Foreign_Investor_buy": "foreign_buy",
+                "Foreign_Investor_sell": "foreign_sell",
+                "Foreign_Investor_net": "foreign_net",
+                "Investment_Trust_buy": "trust_buy",
+                "Investment_Trust_sell": "trust_sell",
+                "Investment_Trust_net": "trust_net",
+                "Dealer_self_buy": "dealer_buy",
+                "Dealer_self_sell": "dealer_sell",
+                "Dealer_self_net": "dealer_net",
+                "Total_net": "total_net",
+            },
+            inplace=True,
+            errors="ignore",
+        )
 
         # 轉換數值欄位
         for col in df.columns:
@@ -139,22 +158,26 @@ class TWSEFetcher:
             return pd.DataFrame()
 
         df = pd.DataFrame(data)
-        df.rename(columns={
-            "Code": "stock_id",
-            "Name": "name",
-            "MarginPurchaseBuy": "margin_buy",
-            "MarginPurchaseSell": "margin_sell",
-            "MarginPurchaseCashRepayment": "margin_repay",
-            "MarginPurchaseLimit": "margin_limit",
-            "MarginPurchaseOutstanding": "margin_balance",
-            "MarginPurchaseTodayBalance": "margin_today_balance",
-            "ShortSaleBuy": "short_buy",
-            "ShortSaleSell": "short_sell",
-            "ShortSaleCashRepayment": "short_repay",
-            "ShortSaleLimit": "short_limit",
-            "ShortSaleOutstanding": "short_balance",
-            "ShortSaleTodayBalance": "short_today_balance",
-        }, inplace=True, errors="ignore")
+        df.rename(
+            columns={
+                "Code": "stock_id",
+                "Name": "name",
+                "MarginPurchaseBuy": "margin_buy",
+                "MarginPurchaseSell": "margin_sell",
+                "MarginPurchaseCashRepayment": "margin_repay",
+                "MarginPurchaseLimit": "margin_limit",
+                "MarginPurchaseOutstanding": "margin_balance",
+                "MarginPurchaseTodayBalance": "margin_today_balance",
+                "ShortSaleBuy": "short_buy",
+                "ShortSaleSell": "short_sell",
+                "ShortSaleCashRepayment": "short_repay",
+                "ShortSaleLimit": "short_limit",
+                "ShortSaleOutstanding": "short_balance",
+                "ShortSaleTodayBalance": "short_today_balance",
+            },
+            inplace=True,
+            errors="ignore",
+        )
 
         for col in df.columns:
             if col not in ("stock_id", "name", "date"):
@@ -166,7 +189,9 @@ class TWSEFetcher:
     # ──────────────────────────────────────────────
     #  個股日成交資訊（歷史 K 棒）
     # ──────────────────────────────────────────────
-    def get_stock_daily_history(self, stock_id: str, year: int, month: int) -> pd.DataFrame:
+    def get_stock_daily_history(
+        self, stock_id: str, year: int, month: int
+    ) -> pd.DataFrame:
         """
         取得個股指定月份的日成交資訊
         URL: https://www.twse.com.tw/exchangeReport/STOCK_DAY
@@ -201,17 +226,19 @@ class TWSEFetcher:
                 ad_year = int(parts[0]) + 1911
                 date_str = f"{ad_year}-{parts[1]}-{parts[2]}"
 
-                rows.append({
-                    "date": date_str,
-                    "volume": int(row[1].replace(",", "")),
-                    "trade_value": int(row[2].replace(",", "")),
-                    "open": float(row[3].replace(",", "")),
-                    "high": float(row[4].replace(",", "")),
-                    "low": float(row[5].replace(",", "")),
-                    "close": float(row[6].replace(",", "")),
-                    "change": row[7].strip(),
-                    "transactions": int(row[8].replace(",", "")),
-                })
+                rows.append(
+                    {
+                        "date": date_str,
+                        "volume": int(row[1].replace(",", "")),
+                        "trade_value": int(row[2].replace(",", "")),
+                        "open": float(row[3].replace(",", "")),
+                        "high": float(row[4].replace(",", "")),
+                        "low": float(row[5].replace(",", "")),
+                        "close": float(row[6].replace(",", "")),
+                        "change": row[7].strip(),
+                        "transactions": int(row[8].replace(",", "")),
+                    }
+                )
             except (ValueError, IndexError) as e:
                 logger.warning(f"解析資料列失敗: {row} - {e}")
                 continue
