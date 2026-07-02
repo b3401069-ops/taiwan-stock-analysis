@@ -54,7 +54,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 black isort mypy
+        # 釘住 black/isort 版本，避免 CI 裝到較新版本產生格式歧異而讓 --check 失敗
+        pip install flake8 black==26.5.1 isort==8.0.1 mypy
     
     - name: Run linting
       run: |
@@ -86,18 +87,17 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install bandit safety
-    
+        pip install bandit pip-audit
+
     - name: Run security checks
       run: |
-        # Check for security issues
+        # 靜態程式碼資安掃描（中高嚴重度＋高信心才視為失敗）
         bandit -r . -ll -ii
-        
-        # Check for vulnerable dependencies
-        safety check
-    
+
     - name: Run dependency audit
       run: |
+        # 相依套件漏洞掃描（非阻斷：新披露的 CVE 不應讓 CI 隨機轉紅）。
+        # 原本的 `safety check` 已棄用且需連線登入 Safety 平台，改用 pip-audit。
         pip-audit || true
 
   build:

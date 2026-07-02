@@ -1,0 +1,17 @@
+[tool.black]
+line-length = 88
+target-version = ["py39", "py310", "py311", "py312"]
+extend-exclude = '''
+/(
+  \.venv
+  | \.git
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+# 與 black 相容，避免兩者互相改回對方的格式而導致 --check 永遠有一方失敗
+profile = "black"
+line_length = 88
+skip = [".venv", ".git", "build", "dist"]
