@@ -13,7 +13,7 @@
 │  OpenClaw Agent      │  HTTP   │  富邦 SDK 服務       │
 │  股票分析系統        │ ──────→ │  (fubon_service.py)  │
 │  主程式 (main.py)    │         │                      │
-│                      │         │  Port: 8081          │
+│                      │         │  Port: 6666          │
 └──────────────────────┘         └──────────────────────┘
          │
          │
@@ -36,8 +36,11 @@ source venv/bin/activate  # Linux/Mac
 # 或
 venv\Scripts\activate     # Windows
 
-# 安裝依賴
-pip install fubon-sdk fastapi uvicorn loguru
+# 安裝服務依賴
+pip install -r requirements_fubon.txt
+
+# 再安裝富邦官方提供的 SDK wheel/installer（官方範例 import 名稱為 fubon_neo）
+# 例：pip install path/to/fubon_neo-*.whl
 ```
 
 ### 1.2 下載服務程式
@@ -51,31 +54,39 @@ pip install fubon-sdk fastapi uvicorn loguru
 ### Linux/Mac
 
 ```bash
-# 設定富邦 API 認證
-export FUBON_API_KEY="你的API Key"
-export FUBON_API_SECRET="你的API Secret"
-export FUBON_ACCOUNT="你的帳號"
+# 設定富邦 API 認證（官方 Python 範例為身分證字號、密碼、憑證路徑、憑證密碼）
+export FUBON_ID="你的身分證字號或登入 ID"
+export FUBON_PASSWORD="你的登入密碼"
+export FUBON_CERT_PATH="./你的憑證.pfx"
+export FUBON_CERT_PASSWORD="你的憑證密碼"
 
-# 設定服務端口（可選，預設 8081）
-export FUBON_SERVICE_PORT=8081
+# 設定服務端口（可選，預設 6666）
+export FUBON_SERVICE_PORT=6666
+
+# 建議設定：主電腦呼叫此服務時需帶相同 token
+export FUBON_SERVICE_TOKEN="自訂一組長隨機字串"
 ```
 
 ### Windows (CMD)
 
 ```cmd
-set FUBON_API_KEY=你的API Key
-set FUBON_API_SECRET=你的API Secret
-set FUBON_ACCOUNT=你的帳號
-set FUBON_SERVICE_PORT=8081
+set FUBON_ID=你的身分證字號或登入 ID
+set FUBON_PASSWORD=你的登入密碼
+set FUBON_CERT_PATH=.\你的憑證.pfx
+set FUBON_CERT_PASSWORD=你的憑證密碼
+set FUBON_SERVICE_PORT=6666
+set FUBON_SERVICE_TOKEN=自訂一組長隨機字串
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-$env:FUBON_API_KEY="你的API Key"
-$env:FUBON_API_SECRET="你的API Secret"
-$env:FUBON_ACCOUNT="你的帳號"
-$env:FUBON_SERVICE_PORT=8081
+$env:FUBON_ID="你的身分證字號或登入 ID"
+$env:FUBON_PASSWORD="你的登入密碼"
+$env:FUBON_CERT_PATH=".\你的憑證.pfx"
+$env:FUBON_CERT_PASSWORD="你的憑證密碼"
+$env:FUBON_SERVICE_PORT=6666
+$env:FUBON_SERVICE_TOKEN="自訂一組長隨機字串"
 ```
 
 ## 步驟 3：啟動富邦服務
@@ -92,7 +103,7 @@ python fubon_service.py
 ╠══════════════════════════════════════════════════════════════╣
 ║  API Key: ghp_Uhwy...                                       ║
 ║  狀態: 已連接                                                ║
-║  端口: 8081                                                  ║
+║  端口: 6666                                                  ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  API 端點:                                                   ║
 ║    GET /quote/{stock_id}         即時報價                   ║
@@ -109,7 +120,7 @@ python fubon_service.py
 ### 4.1 健康檢查
 
 ```bash
-curl http://localhost:8081/health
+curl http://localhost:6666/health
 ```
 
 預期回應：
@@ -124,24 +135,25 @@ curl http://localhost:8081/health
 ### 4.2 取得即時報價
 
 ```bash
-curl http://localhost:8081/quote/2330
+curl http://localhost:6666/quote/2330
 ```
 
 ### 4.3 取得綜合資料
 
 ```bash
-curl http://localhost:8081/comprehensive/2330
+curl http://localhost:6666/comprehensive/2330
 ```
 
 ## 步驟 5：連接到主電腦的分析系統
 
 ### 5.1 修改主電腦配置
 
-在主電腦的 `config/config.py` 中加入：
+在主電腦的 `.env` 中加入：
 
-```python
-# 富邦服務配置
-FUBON_SERVICE_URL = "http://另一台電腦的IP:8081"
+```env
+FUBON_SERVICE_URL=http://另一台電腦的IP:6666
+FUBON_SERVICE_TOKEN=和另一台電腦相同的token
+FUBON_REQUEST_TIMEOUT=10
 ```
 
 ### 5.2 使用 OpenClaw Agent
@@ -150,7 +162,7 @@ FUBON_SERVICE_URL = "http://另一台電腦的IP:8081"
 from agents.openclaw_agent import get_openclaw_agent
 
 # 指定富邦服務 URL
-agent = get_openclaw_agent(fubon_service_url="http://192.168.1.100:8081")
+agent = get_openclaw_agent(fubon_service_url="http://192.168.1.100:6666")
 
 # 分析股票（包含富邦數據）
 result = await agent.analyze_stock("2330.TW", include_fubon=True)
@@ -298,15 +310,15 @@ GET /margin/{stock_id}
 ### 1. 無法連接富邦 SDK
 
 ```
-錯誤: fubon_sdk 未安裝
-解決: pip install fubon-sdk
+錯誤: fubon_neo 未安裝
+解決: 從富邦官方 SDK 下載頁下載 Python SDK wheel/installer 後安裝
 ```
 
-### 2. API Key 錯誤
+### 2. 登入資訊或憑證錯誤
 
 ```
 錯誤: 富邦 SDK 連接失敗
-解決: 檢查 FUBON_API_KEY、FUBON_API_SECRET、FUBON_ACCOUNT 是否正確
+解決: 檢查 FUBON_ID、FUBON_PASSWORD、FUBON_CERT_PATH、FUBON_CERT_PASSWORD 是否正確
 ```
 
 ### 3. 無法連接服務
@@ -315,7 +327,7 @@ GET /margin/{stock_id}
 錯誤: requests.exceptions.ConnectionError
 解決: 
 1. 確認富邦服務已啟動
-2. 確認防火牆允許 8081 端口
+2. 確認防火牆允許 6666 端口
 3. 確認 IP 地址正確
 ```
 
@@ -324,8 +336,8 @@ GET /margin/{stock_id}
 ```
 錯誤: [Errno 98] Address already in use
 解決: 
-1. 更改端口: export FUBON_SERVICE_PORT=8082
-2. 或殺死占用端口的程序: lsof -i :8081
+1. 更改端口: export FUBON_SERVICE_PORT=6667
+2. 或殺死占用端口的程序: lsof -i :6666
 ```
 
 ## 安全注意事項

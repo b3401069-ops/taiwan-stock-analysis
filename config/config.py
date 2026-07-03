@@ -29,8 +29,18 @@ class Settings(BaseSettings):
     # 券商API配置
     SHIOAJI_API_KEY: Optional[str] = None
     SHIOAJI_SECRET_KEY: Optional[str] = None
+    # 富邦新一代 API（fubon_neo）。保留舊 FUBON_* 欄位是為了相容既有 .env。
+    FUBON_ID: Optional[str] = None
+    FUBON_PASSWORD: Optional[str] = None
+    FUBON_CERT_PATH: Optional[str] = None
+    FUBON_CERT_PASSWORD: Optional[str] = None
     FUBON_API_KEY: Optional[str] = None
     FUBON_SECRET_KEY: Optional[str] = None
+    FUBON_API_SECRET: Optional[str] = None
+    FUBON_ACCOUNT: Optional[str] = None
+    FUBON_SERVICE_URL: Optional[str] = None
+    FUBON_SERVICE_TOKEN: Optional[str] = None
+    FUBON_REQUEST_TIMEOUT: int = 10
 
     # Yahoo Finance配置
     YAHOO_FINANCE_TIMEOUT: int = 30

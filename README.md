@@ -146,7 +146,7 @@ curl "http://localhost:9999/api/v1/twse/daily"
 
 ## 富邦證券 SDK 整合
 
-系統支援整合富邦證券 SDK，提供即時報價、完整財報、籌碼面數據。
+系統支援整合富邦新一代 API Python SDK（`fubon_neo`），提供即時報價、歷史 K 線與帳務查詢。財報與三大法人資料請使用 repo 既有 TWSE/FinMind 資料來源。
 
 ### 架構
 
@@ -155,7 +155,7 @@ curl "http://localhost:9999/api/v1/twse/daily"
 ┌──────────────────┐         ┌──────────────────┐
 │ OpenClaw Agent   │  HTTP   │ 富邦 SDK 服務    │
 │ 股票分析系統     │ ──────→ │ (fubon_service)  │
-│ main.py          │         │ Port: 8081       │
+│ main.py          │         │ Port: 6666       │
 └──────────────────┘         └──────────────────┘
 ```
 
@@ -164,15 +164,17 @@ curl "http://localhost:9999/api/v1/twse/daily"
 1. 在有富邦 SDK 的電腦上執行：
 ```bash
 pip install -r requirements_fubon.txt
-export FUBON_API_KEY=your_key
-export FUBON_API_SECRET=your_secret
+export FUBON_ID=your_login_id
+export FUBON_PASSWORD=your_login_password
+export FUBON_CERT_PATH=./your_cert.pfx
+export FUBON_CERT_PASSWORD=your_cert_password
 python fubon_service.py
 ```
 
 2. 在主電腦連接：
 ```python
 from agents.openclaw_agent import get_openclaw_agent
-agent = get_openclaw_agent(fubon_service_url="http://192.168.1.100:8081")
+agent = get_openclaw_agent(fubon_service_url="http://192.168.1.100:6666")
 result = await agent.analyze_stock("2330.TW")
 ```
 

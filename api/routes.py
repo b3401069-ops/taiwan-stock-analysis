@@ -293,12 +293,46 @@ async def place_order(
     quantity: int,
     price: float,
     broker: Optional[str] = Query("shioaji", description="券商名稱（shioaji, fubon）"),
+    dry_run: bool = Query(True, description="是否只模擬下單；預設 true 避免誤送真實委託"),
     service: StockService = Depends(get_stock_service),
 ):
     """下單"""
     try:
-        order = await service.place_order(stock_id, action, quantity, price, broker)
+        order = await service.place_order(
+            stock_id, action, quantity, price, broker, dry_run
+        )
         return {"success": True, "data": order}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/broker/fubon/status", summary="富邦服務狀態")
+async def get_fubon_status(service: StockService = Depends(get_stock_service)):
+    """檢查遠端富邦 SDK 服務是否可連線。"""
+    try:
+        return await service.get_fubon_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/broker/fubon/quote/{stock_id}", summary="富邦即時報價")
+async def get_fubon_quote(
+    stock_id: str, service: StockService = Depends(get_stock_service)
+):
+    """透過遠端富邦 SDK 服務取得即時報價。"""
+    try:
+        return await service.get_fubon_quote(stock_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/broker/fubon/comprehensive/{stock_id}", summary="富邦綜合資料")
+async def get_fubon_comprehensive(
+    stock_id: str, service: StockService = Depends(get_stock_service)
+):
+    """透過遠端富邦 SDK 服務取得報價、歷史、財報與籌碼資料。"""
+    try:
+        return await service.get_fubon_comprehensive(stock_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
