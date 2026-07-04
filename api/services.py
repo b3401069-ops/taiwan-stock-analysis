@@ -26,6 +26,7 @@ from config.config import get_settings
 from data.data_fetcher import DataFetcher
 from data.stock_data import StockData
 from models.portfolio import PortfolioOptimizer
+from services.fubon_client import FubonClient
 
 # 導入建議模組
 from models.recommendation import RecommendationEngine
@@ -38,6 +39,11 @@ class StockService:
         self.settings = get_settings()
         self.data_fetcher = DataFetcher()
         self.stock_data = StockData()
+        self.fubon_client = FubonClient(
+            base_url=self.settings.FUBON_SERVICE_URL,
+            timeout=self.settings.FUBON_REQUEST_TIMEOUT,
+            service_token=self.settings.FUBON_SERVICE_TOKEN,
+        )
 
     async def get_stocks(
         self, market: Optional[str] = None, industry: Optional[str] = None
@@ -109,36 +115,73 @@ class StockService:
     async def get_broker_accounts(self, broker: Optional[str] = None) -> List[Dict]:
         """獲取券商帳戶資訊"""
         try:
-            # 這裡應該從券商API獲取帳戶資訊
-            # 暫時返回示例數據
+            broker_name = (broker or "").lower()
+            if broker_name == "fubon":
+                result = self.fubon_client.accounts()
+                if not result.get("success"):
+                    return [result]
+                data = result.get("data", [])
+                return data if isinstance(data, list) else [data]
+
             return [
                 {"broker": "shioaji", "account": "示例帳戶1", "balance": 1000000},
-                {"broker": "fubon", "account": "示例帳戶2", "balance": 500000},
+                {
+                    "broker": "fubon",
+                    "configured": self.fubon_client.enabled,
+                    "service_url": self.settings.FUBON_SERVICE_URL,
+                },
             ]
         except Exception as e:
             logger.error(f"獲取券商帳戶資訊失敗: {e}")
             raise
 
     async def place_order(
-        self, stock_id: str, action: str, quantity: int, price: float, broker: str
+        self,
+        stock_id: str,
+        action: str,
+        quantity: int,
+        price: float,
+        broker: str,
+        dry_run: bool = True,
     ) -> Dict:
         """下單"""
         try:
-            # 這裡應該調用券商API下單
-            # 暫時返回示例數據
+            broker_name = (broker or "").lower()
+            if broker_name == "fubon":
+                return self.fubon_client.place_order(
+                    stock_id=stock_id,
+                    action=action,
+                    quantity=quantity,
+                    price=price,
+                    dry_run=dry_run,
+                )
+
             return {
                 "order_id": "示例訂單ID",
                 "stock_id": stock_id,
                 "action": action,
                 "quantity": quantity,
                 "price": price,
-                "broker": broker,
+                "broker": broker_name or broker,
+                "dry_run": dry_run,
                 "status": "pending",
                 "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"下單失敗: {e}")
             raise
+
+    async def get_fubon_status(self) -> Dict:
+        """取得富邦服務狀態"""
+        return self.fubon_client.health()
+
+    async def get_fubon_quote(self, stock_id: str) -> Dict:
+        """透過富邦服務取得即時報價"""
+        return self.fubon_client.quote(stock_id)
+
+    async def get_fubon_comprehensive(self, stock_id: str) -> Dict:
+        """透過富邦服務取得綜合資料"""
+        return self.fubon_client.comprehensive(stock_id)
 
 
 class AnalysisService:

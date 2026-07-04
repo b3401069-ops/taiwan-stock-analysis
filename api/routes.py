@@ -6,9 +6,11 @@ from datetime import date, datetime
 from typing import List, Optional
 
 import pandas as pd
+import requests
 import schedule
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
+from sqlalchemy import text
 
 from agents.stock_chatbot import get_stock_chatbot
 from analysis.ai_stock_summary import get_ai_stock_summary
@@ -25,6 +27,7 @@ from analysis.stock_analyst import get_stock_analyst
 from analysis.valuation_metrics import get_valuation_metrics
 from analysis.virtual_portfolio import get_virtual_portfolio
 from analysis.walk_forward import get_walk_forward_validator
+from config.config import get_settings
 
 # 導入服務
 from api.services import AnalysisService, RecommendationService, StockService
@@ -54,6 +57,54 @@ def get_analysis_service():
 def get_recommendation_service():
     """獲取建議服務實例"""
     return RecommendationService()
+
+
+def _service_status(status: str, detail: str = "") -> dict:
+    """Build a consistent service health payload."""
+    payload = {"status": status}
+    if detail:
+        payload["detail"] = detail
+    return payload
+
+
+def _check_database_status() -> dict:
+    try:
+        db = get_db_manager()
+        with db.get_session() as session:
+            session.execute(text("SELECT 1"))
+        return _service_status("connected", "local database reachable")
+    except Exception as exc:
+        logger.warning(f"Database health check failed: {exc}")
+        return _service_status("error", str(exc))
+
+
+def _check_http_status(
+    service_name: str,
+    base_url: Optional[str],
+    *,
+    token: Optional[str] = None,
+    token_header: str = "Authorization",
+    timeout: int = 2,
+) -> dict:
+    if not base_url:
+        return _service_status("not_configured")
+
+    headers = {}
+    if token:
+        headers[token_header] = (
+            f"Bearer {token}" if token_header.lower() == "authorization" else token
+        )
+
+    try:
+        response = requests.get(
+            f"{base_url.rstrip('/')}/health", headers=headers, timeout=timeout
+        )
+        if response.ok:
+            return _service_status("connected", f"HTTP {response.status_code}")
+        return _service_status("error", f"HTTP {response.status_code}")
+    except requests.exceptions.RequestException as exc:
+        logger.warning(f"{service_name} health check failed: {exc}")
+        return _service_status("error", str(exc))
 
 
 # 股票資料端點
@@ -293,12 +344,46 @@ async def place_order(
     quantity: int,
     price: float,
     broker: Optional[str] = Query("shioaji", description="券商名稱（shioaji, fubon）"),
+    dry_run: bool = Query(True, description="是否只模擬下單；預設 true 避免誤送真實委託"),
     service: StockService = Depends(get_stock_service),
 ):
     """下單"""
     try:
-        order = await service.place_order(stock_id, action, quantity, price, broker)
+        order = await service.place_order(
+            stock_id, action, quantity, price, broker, dry_run
+        )
         return {"success": True, "data": order}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/broker/fubon/status", summary="富邦服務狀態")
+async def get_fubon_status(service: StockService = Depends(get_stock_service)):
+    """檢查遠端富邦 SDK 服務是否可連線。"""
+    try:
+        return await service.get_fubon_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/broker/fubon/quote/{stock_id}", summary="富邦即時報價")
+async def get_fubon_quote(
+    stock_id: str, service: StockService = Depends(get_stock_service)
+):
+    """透過遠端富邦 SDK 服務取得即時報價。"""
+    try:
+        return await service.get_fubon_quote(stock_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/broker/fubon/comprehensive/{stock_id}", summary="富邦綜合資料")
+async def get_fubon_comprehensive(
+    stock_id: str, service: StockService = Depends(get_stock_service)
+):
+    """透過遠端富邦 SDK 服務取得報價、歷史、財報與籌碼資料。"""
+    try:
+        return await service.get_fubon_comprehensive(stock_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1149,25 +1234,6 @@ async def walk_forward_validate(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/backtest/strategies", summary="可用策略列表")
-async def get_available_strategies():
-    """取得所有可用的回測策略"""
-    try:
-        from analysis.backtest import STRATEGIES
-
-        strategies = {}
-        for name, func in STRATEGIES.items():
-            strategies[name] = {
-                "name": name,
-                "description": func.__doc__.strip() if func.__doc__ else "",
-                "function": func.__name__,
-            }
-
-        return {"success": True, "data": strategies}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # ──────────────────────────────────────────────
 #  五因子歸因分析端點
 # ──────────────────────────────────────────────
@@ -1631,20 +1697,50 @@ async def get_db_stocks():
 async def get_system_status():
     """獲取系統狀態"""
     try:
-        # 這裡應該檢查各個服務的狀態
+        settings = get_settings()
+        services = {
+            "database": _check_database_status(),
+            "redis": _service_status(
+                "not_checked", "No Redis health checker is configured"
+            ),
+            "shioaji": (
+                _service_status("configured")
+                if settings.SHIOAJI_API_KEY and settings.SHIOAJI_SECRET_KEY
+                else _service_status("not_configured")
+            ),
+            "fubon": _check_http_status(
+                "fubon",
+                settings.FUBON_SERVICE_URL,
+                token=settings.FUBON_SERVICE_TOKEN,
+                token_header="X-Fubon-Service-Token",
+                timeout=settings.FUBON_REQUEST_TIMEOUT,
+            ),
+            "openclaw": (
+                _check_http_status(
+                    "openclaw",
+                    settings.OPENCLAW_API_URL,
+                    token=settings.OPENCLAW_API_KEY,
+                )
+                if settings.OPENCLAW_API_KEY
+                else _service_status("not_configured", "OPENCLAW_API_KEY is empty")
+            ),
+            "hermes": (
+                _check_http_status(
+                    "hermes",
+                    settings.HERMES_API_URL,
+                    token=settings.HERMES_API_KEY,
+                )
+                if settings.HERMES_API_KEY
+                else _service_status("not_configured", "HERMES_API_KEY is empty")
+            ),
+        }
+        has_error = any(item["status"] == "error" for item in services.values())
         return {
             "success": True,
             "data": {
-                "status": "running",
+                "status": "degraded" if has_error else "running",
                 "timestamp": datetime.now().isoformat(),
-                "services": {
-                    "database": "connected",
-                    "redis": "connected",
-                    "shioaji": "connected",
-                    "fubon": "connected",
-                    "openclaw": "connected",
-                    "hermes": "connected",
-                },
+                "services": services,
             },
         }
     except Exception as e:

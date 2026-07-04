@@ -1,8 +1,10 @@
 # 富邦證券 SDK 服務依賴清單
 # 在有富邦 SDK 的電腦上安裝
 
-# 富邦 SDK (需要從富邦官網下載)
-# fubon-sdk
+# 富邦新一代 API Python SDK 需從富邦官方平台下載 wheel/installer 後另外安裝。
+# 官方範例套件名稱為 fubon_neo。
+# PyPI 目前查不到公開的 fubon-sdk / fubon-neo 套件；請勿只執行
+# `pip install fubon-sdk`，否則會找不到套件。
 
 # Web 框架
 fastapi>=0.100.0

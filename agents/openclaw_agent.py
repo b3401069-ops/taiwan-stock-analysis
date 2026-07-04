@@ -22,7 +22,7 @@ class OpenClawAgent:
         self.api_key = self.settings.OPENCLAW_API_KEY
 
         # 富邦服務 URL（另一台電腦的服務地址）
-        self.fubon_service_url = fubon_service_url or "http://localhost:8081"
+        self.fubon_service_url = fubon_service_url or "http://localhost:6666"
 
     async def chat(self, message: str) -> Dict:
         """與OpenClaw Agent對話"""
@@ -142,10 +142,9 @@ class OpenClawAgent:
         if fubon_data:
             realtime = fubon_data.get("realtime", {}).get("data", {})
             if realtime:
-                price_info = realtime.get("price_info", {})
-                prompt += f"\n目前股價資訊："
-                prompt += f"\n- 現價: {price_info.get('current', 'N/A')}"
-                prompt += f"\n- 漲跌: {price_info.get('change', 'N/A')} ({price_info.get('change_percent', 'N/A')}%)"
+                price_info = realtime.get("price_info") or realtime.get("raw", {})
+                prompt += f"\n目前股價資訊（富邦原始欄位）："
+                prompt += f"\n{json.dumps(price_info, ensure_ascii=False, indent=2)}"
 
             institutional = fubon_data.get("institutional", {}).get("data", {})
             if institutional:
