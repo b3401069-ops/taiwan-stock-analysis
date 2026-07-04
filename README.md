@@ -202,7 +202,7 @@ result = await agent.analyze_stock("2330.TW")
 | 公開資訊觀測站 (MOPS) | ✅ | 三大報表 |
 | TWSE OpenAPI | ✅ | 基本財務指標 |
 | Yahoo Finance | ✅ | 財報、估值 |
-| **富邦證券 SDK** | ✅ | 即時報價、完整財報、籌碼 |
+| **富邦證券 SDK** | ✅ | 即時報價、歷史 K 線、庫存、銀行餘額、資券配額 |
 
 ## 授權
 

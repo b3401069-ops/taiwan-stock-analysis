@@ -99,19 +99,21 @@ python fubon_service.py
 服務啟動後會顯示：
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║              富邦證券 SDK 服務                               ║
+║              富邦新一代 API SDK 服務                         ║
 ╠══════════════════════════════════════════════════════════════╣
-║  API Key: ghp_Uhwy...                                       ║
+║  Login ID: 已設定                                            ║
 ║  狀態: 已連接                                                ║
 ║  端口: 6666                                                  ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  API 端點:                                                   ║
 ║    GET /quote/{stock_id}         即時報價                   ║
-║    GET /historical/{stock_id}    歷史資料                   ║
-║    GET /financial/{stock_id}     財報數據                   ║
-║    GET /institutional/{stock_id} 三大法人                   ║
-║    GET /margin/{stock_id}        融資融券                   ║
+║    GET /ticker/{stock_id}        股票資訊                   ║
+║    GET /historical/{stock_id}    歷史 K 線                  ║
+║    GET /inventories              庫存查詢                   ║
+║    GET /bank-remain              銀行餘額                   ║
+║    GET /margin/{stock_id}        資券配額                   ║
 ║    GET /comprehensive/{stock_id} 綜合資料                   ║
+║    POST /order                   下單（預設 dry_run）       ║
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
@@ -236,53 +238,19 @@ GET /historical/{stock_id}?days=365&interval=1d
 
 ```
 GET /financial/{stock_id}?report_type=ratios
-
-report_type 可選值:
-- ratios: 財務比率
-- income: 損益表
-- balance: 資產負債表
-- cashflow: 現金流量表
-
-回傳格式:
-{
-  "success": true,
-  "data": {
-    "stock_id": "2330",
-    "report_type": "ratios",
-    "period": "2023Q4",
-    "data": {
-      "gross_margin": 55.2,
-      "operating_margin": 45.8,
-      "net_margin": 40.1,
-      "eps": 32.5
-    }
-  }
-}
 ```
+
+富邦官方 Python 範例未提供財報查詢 method。這個端點會明確回傳
+`success: false`，提醒改用 repo 既有的 `financial_fetcher`、TWSE 或 FinMind。
 
 ### 三大法人
 
 ```
 GET /institutional/{stock_id}
-
-回傳格式:
-{
-  "success": true,
-  "data": {
-    "stock_id": "2330",
-    "date": "2024-01-01",
-    "foreign_buy": 1000000,
-    "foreign_sell": 800000,
-    "foreign_net": 200000,
-    "trust_buy": 500000,
-    "trust_sell": 300000,
-    "trust_net": 200000,
-    "dealer_buy": 100000,
-    "dealer_sell": 80000,
-    "dealer_net": 20000
-  }
-}
 ```
+
+富邦官方 Python 範例未提供三大法人查詢 method。這個端點會明確回傳
+`success: false`，提醒改用 TWSE/FinMind 的法人資料端點。
 
 ### 融資融券
 
@@ -342,7 +310,7 @@ GET /margin/{stock_id}
 
 ## 安全注意事項
 
-1. **不要將 API Key 提交到 Git**
+1. **不要將帳密、憑證、服務 token 提交到 Git**
    - 使用環境變數
    - 或使用 `.env` 檔案（已加入 .gitignore）
 
@@ -350,14 +318,14 @@ GET /margin/{stock_id}
    - 只允許本地網路訪問
    - 或使用 VPN
 
-3. **定期更換 API Key**
+3. **定期更換服務 token**
    - 每 3-6 個月更換一次
 
 ## 下一步
 
 成功連接後，可以：
 
-1. 使用即時報價進行自動交易
-2. 使用財報數據進行基本面分析
-3. 使用法人數據進行籌碼面分析
+1. 使用即時報價、歷史 K 線與帳務資料輔助分析
+2. 使用 TWSE/FinMind 財報數據進行基本面分析
+3. 使用 TWSE/FinMind 法人數據進行籌碼面分析
 4. 結合 AI 進行綜合分析
