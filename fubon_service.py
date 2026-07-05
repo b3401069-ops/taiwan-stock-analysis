@@ -36,9 +36,13 @@ except ImportError:
 # ──────────────────────────────────────────────
 
 PERSONAL_ID = os.getenv("FUBON_PERSONAL_ID", "")  # 身分證字號
-PASSWORD = os.getenv("FUBON_PASSWORD", "")  # 登入密碼
+PASSWORD = os.getenv("FUBON_PASSWORD") or os.getenv(
+    "FUBON_LOGIN_PASSWORD", ""
+)  # 登入密碼
 CERT_PATH = os.getenv("FUBON_CERT_PATH", "")  # 憑證檔（.pfx）完整路徑
-CERT_PASS = os.getenv("FUBON_CERT_PASS", "")  # 憑證密碼（未設定則不帶）
+CERT_PASS = os.getenv("FUBON_CERT_PASS") or os.getenv(
+    "FUBON_CERT_PASSWORD", ""
+)  # 憑證密碼（未設定則不帶）
 PORT = int(os.getenv("FUBON_SERVICE_PORT", "8081"))
 # 服務自身的存取金鑰：本服務會回傳真實持股與損益，強烈建議設定。
 # 設定後所有資料端點都要求 X-API-Key 標頭；/health 除外。
@@ -50,24 +54,51 @@ SERVICE_API_KEY = os.getenv("FUBON_SERVICE_API_KEY", "")
 # ──────────────────────────────────────────────
 
 
-def to_jsonable(obj: Any) -> Any:
+SENSITIVE_KEY_PARTS = (
+    "account",
+    "branch",
+    "cert",
+    "password",
+    "personal",
+    "token",
+    "idno",
+)
+
+
+def to_jsonable(obj: Any, depth: int = 0, seen: Optional[set] = None) -> Any:
     """把 fubon_neo 回傳的物件（Rust/pyo3 物件、巢狀結構）轉成可 JSON 化的型別。
 
     SDK 物件沒有 __dict__，改走 dir() 取公開屬性；不同 SDK 版本欄位增減
     也能容錯，不需要逐欄位維護對照表。
     """
+    if seen is None:
+        seen = set()
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
     if isinstance(obj, datetime):
         return obj.isoformat()
+    if depth >= 4:
+        return str(obj)
+
+    obj_id = id(obj)
+    if obj_id in seen:
+        return str(obj)
+    seen.add(obj_id)
+
     if isinstance(obj, dict):
-        return {str(k): to_jsonable(v) for k, v in obj.items()}
+        return {
+            str(k): to_jsonable(v, depth + 1, seen)
+            for k, v in obj.items()
+            if not any(part in str(k).lower() for part in SENSITIVE_KEY_PARTS)
+        }
     if isinstance(obj, (list, tuple)):
-        return [to_jsonable(v) for v in obj]
+        return [to_jsonable(v, depth + 1, seen) for v in obj]
 
     fields: Dict[str, Any] = {}
     for name in dir(obj):
         if name.startswith("_"):
+            continue
+        if any(part in name.lower() for part in SENSITIVE_KEY_PARTS):
             continue
         try:
             value = getattr(obj, name)
@@ -75,7 +106,10 @@ def to_jsonable(obj: Any) -> Any:
             continue
         if callable(value):
             continue
-        fields[name] = to_jsonable(value)
+        if value is None or isinstance(
+            value, (str, int, float, bool, list, tuple, dict, datetime)
+        ):
+            fields[name] = to_jsonable(value, depth + 1, seen)
     return fields if fields else str(obj)
 
 
