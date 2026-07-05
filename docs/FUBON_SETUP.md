@@ -1,351 +1,129 @@
-# 富邦證券 SDK 整合指南
+# 富邦證券 SDK 整合指南（fubon_neo）
 
 ## 架構說明
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        整體架構                                 │
-└─────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────┐         ┌──────────────────────┐
-│   主電腦 (本機)       │         │  另一台電腦 (有富邦SDK) │
-│                      │         │                      │
-│  OpenClaw Agent      │  HTTP   │  富邦 SDK 服務       │
-│  股票分析系統        │ ──────→ │  (fubon_service.py)  │
-│  主程式 (main.py)    │         │                      │
-│                      │         │  Port: 8081          │
-└──────────────────────┘         └──────────────────────┘
-         │
-         │
-         ▼
-┌──────────────────────┐
-│     GitHub API       │
-│     TWSE API         │
-│     Yahoo Finance    │
-└──────────────────────┘
+┌──────────────────────┐         ┌──────────────────────────┐
+│   主電腦 (本機)       │         │  另一台電腦 (有富邦SDK)   │
+│                      │         │                          │
+│  分析系統 main.py    │  HTTP   │  富邦 SDK 服務（唯讀）    │
+│  (Port 9999)         │ ──────→ │  fubon_service.py        │
+│  OpenClaw Agent      │         │  (Port 8081)             │
+└──────────────────────┘         └──────────────────────────┘
 ```
 
-## 步驟 1：在另一台電腦安裝富邦 SDK
+富邦服務提供**唯讀**查詢：帳戶持股、未實現損益、交割銀行餘額、即時報價、歷史K線。
+**不提供下單功能。**
 
-### 1.1 安裝 Python 依賴
+## 事前準備（重要）
+
+富邦新一代 API（Neo SDK）的登入方式是「**身分證字號 + 登入密碼 + 電子憑證**」，
+不是 API Key/Secret。你需要：
+
+1. 富邦證券帳戶，且已申請**新一代 API** 使用權（富邦 e 點通或官網申請）
+2. 下載**電子憑證**（`.pfx` 檔）到執行服務的電腦，記下憑證密碼
+
+## 步驟 1：安裝 SDK
 
 ```bash
-# 建立虛擬環境
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-venv\Scripts\activate     # Windows
+venv\Scripts\activate      # Windows
+# source venv/bin/activate # Linux/Mac
 
-# 安裝依賴
-pip install fubon-sdk fastapi uvicorn loguru
+pip install -r requirements_fubon.txt
 ```
 
-### 1.2 下載服務程式
-
-將以下檔案複製到另一台電腦：
-- `fubon_service.py` - 富邦服務主程式
-- `requirements_fubon.txt` - 依賴清單
+若 `pip install fubon-neo` 失敗，到富邦官網「新一代API」下載對應平台的
+wheel 檔，再 `pip install <檔名>.whl`。
 
 ## 步驟 2：設定環境變數
-
-### Linux/Mac
-
-```bash
-# 設定富邦 API 認證
-export FUBON_API_KEY="你的API Key"
-export FUBON_API_SECRET="你的API Secret"
-export FUBON_ACCOUNT="你的帳號"
-
-# 設定服務端口（可選，預設 8081）
-export FUBON_SERVICE_PORT=8081
-```
-
-### Windows (CMD)
-
-```cmd
-set FUBON_API_KEY=你的API Key
-set FUBON_API_SECRET=你的API Secret
-set FUBON_ACCOUNT=你的帳號
-set FUBON_SERVICE_PORT=8081
-```
 
 ### Windows (PowerShell)
 
 ```powershell
-$env:FUBON_API_KEY="你的API Key"
-$env:FUBON_API_SECRET="你的API Secret"
-$env:FUBON_ACCOUNT="你的帳號"
-$env:FUBON_SERVICE_PORT=8081
+$env:FUBON_PERSONAL_ID = "A123456789"          # 身分證字號
+$env:FUBON_PASSWORD = "你的登入密碼"
+$env:FUBON_CERT_PATH = "C:\certs\你的憑證.pfx"  # 憑證檔完整路徑
+$env:FUBON_CERT_PASS = "憑證密碼"               # 沒有憑證密碼可不設
+$env:FUBON_SERVICE_API_KEY = "自訂一組長隨機字串"  # 服務存取金鑰，強烈建議
+$env:FUBON_SERVICE_PORT = "8081"               # 可選，預設 8081
 ```
 
-## 步驟 3：啟動富邦服務
+### Linux/Mac
 
 ```bash
-# 啟動服務
+export FUBON_PERSONAL_ID="A123456789"
+export FUBON_PASSWORD="你的登入密碼"
+export FUBON_CERT_PATH="/home/user/certs/憑證.pfx"
+export FUBON_CERT_PASS="憑證密碼"
+export FUBON_SERVICE_API_KEY="自訂一組長隨機字串"
+```
+
+## 步驟 3：啟動服務
+
+```bash
 python fubon_service.py
 ```
 
-服務啟動後會顯示：
-```
-╔══════════════════════════════════════════════════════════════╗
-║              富邦證券 SDK 服務                               ║
-╠══════════════════════════════════════════════════════════════╣
-║  API Key: ghp_Uhwy...                                       ║
-║  狀態: 已連接                                                ║
-║  端口: 8081                                                  ║
-╠══════════════════════════════════════════════════════════════╣
-║  API 端點:                                                   ║
-║    GET /quote/{stock_id}         即時報價                   ║
-║    GET /historical/{stock_id}    歷史資料                   ║
-║    GET /financial/{stock_id}     財報數據                   ║
-║    GET /institutional/{stock_id} 三大法人                   ║
-║    GET /margin/{stock_id}        融資融券                   ║
-║    GET /comprehensive/{stock_id} 綜合資料                   ║
-╚══════════════════════════════════════════════════════════════╝
-```
+啟動畫面會顯示 SDK 連線狀態與端點清單。若顯示「未連接」，檢查：
+- 憑證路徑是否正確、憑證是否過期
+- 身分證字號/密碼是否正確
+- 是否已申請新一代 API 使用權
 
-## 步驟 4：測試服務
-
-### 4.1 健康檢查
+## 步驟 4：測試
 
 ```bash
+# 健康檢查（免驗證）
 curl http://localhost:8081/health
+
+# 持股查詢（需帶金鑰）
+curl -H "X-API-Key: 你的FUBON_SERVICE_API_KEY" http://localhost:8081/positions
+
+# 投資組合全貌（持股 + 損益 + 報價）
+curl -H "X-API-Key: 你的FUBON_SERVICE_API_KEY" http://localhost:8081/portfolio/summary
 ```
 
-預期回應：
-```json
-{
-  "status": "healthy",
-  "fubon_connected": true,
-  "timestamp": "2024-01-01T12:00:00"
-}
-```
+## API 端點
 
-### 4.2 取得即時報價
+| 端點 | 說明 | 驗證 |
+|------|------|------|
+| `GET /health` | 健康檢查 | 免 |
+| `GET /accounts` | 帳戶清單 | 要 |
+| `GET /positions?account_index=0` | 持股庫存 | 要 |
+| `GET /pnl/unrealized` | 未實現損益 | 要 |
+| `GET /balance` | 交割銀行餘額 | 要 |
+| `GET /portfolio/summary` | 持股+損益+即時報價 | 要 |
+| `GET /quote/{stock_id}` | 即時報價 | 要 |
+| `GET /historical/{stock_id}?days=365` | 歷史日K線 | 要 |
+
+## 從主電腦連接
 
 ```bash
-curl http://localhost:8081/quote/2330
+curl -H "X-API-Key: 金鑰" http://<SDK電腦IP>:8081/portfolio/summary
 ```
 
-### 4.3 取得綜合資料
+OpenClaw 整合請見 `openclaw_skills/taiwan-stock/SKILL.md`。
 
-```bash
-curl http://localhost:8081/comprehensive/2330
-```
+## 安全注意事項（必讀）
 
-## 步驟 5：連接到主電腦的分析系統
+此服務回傳你的**真實持股與損益**，且綁定 `0.0.0.0`（整個區網可連）：
 
-### 5.1 修改主電腦配置
-
-在主電腦的 `config/config.py` 中加入：
-
-```python
-# 富邦服務配置
-FUBON_SERVICE_URL = "http://另一台電腦的IP:8081"
-```
-
-### 5.2 使用 OpenClaw Agent
-
-```python
-from agents.openclaw_agent import get_openclaw_agent
-
-# 指定富邦服務 URL
-agent = get_openclaw_agent(fubon_service_url="http://192.168.1.100:8081")
-
-# 分析股票（包含富邦數據）
-result = await agent.analyze_stock("2330.TW", include_fubon=True)
-print(result)
-```
-
-## API 端點說明
-
-### 即時報價
-
-```
-GET /quote/{stock_id}
-
-回傳格式:
-{
-  "success": true,
-  "data": {
-    "stock_id": "2330",
-    "timestamp": "2024-01-01T12:00:00",
-    "price_info": {
-      "current": 1000.0,
-      "open": 995.0,
-      "high": 1010.0,
-      "low": 990.0,
-      "change": 5.0,
-      "change_percent": 0.5
-    },
-    "volume_info": {
-      "volume": 50000000,
-      "amount": 50000000000
-    },
-    "orderbook": {
-      "bid": [...],
-      "ask": [...]
-    }
-  }
-}
-```
-
-### 歷史資料
-
-```
-GET /historical/{stock_id}?days=365&interval=1d
-
-參數:
-- days: 歷史天數 (預設 365)
-- interval: 資料間隔 (1m, 5m, 15m, 30m, 1h, 1d)
-
-回傳格式:
-{
-  "success": true,
-  "data": {
-    "stock_id": "2330",
-    "count": 365,
-    "data": [
-      {
-        "date": "2024-01-01",
-        "open": 995.0,
-        "high": 1010.0,
-        "low": 990.0,
-        "close": 1000.0,
-        "volume": 50000000
-      },
-      ...
-    ]
-  }
-}
-```
-
-### 財報數據
-
-```
-GET /financial/{stock_id}?report_type=ratios
-
-report_type 可選值:
-- ratios: 財務比率
-- income: 損益表
-- balance: 資產負債表
-- cashflow: 現金流量表
-
-回傳格式:
-{
-  "success": true,
-  "data": {
-    "stock_id": "2330",
-    "report_type": "ratios",
-    "period": "2023Q4",
-    "data": {
-      "gross_margin": 55.2,
-      "operating_margin": 45.8,
-      "net_margin": 40.1,
-      "eps": 32.5
-    }
-  }
-}
-```
-
-### 三大法人
-
-```
-GET /institutional/{stock_id}
-
-回傳格式:
-{
-  "success": true,
-  "data": {
-    "stock_id": "2330",
-    "date": "2024-01-01",
-    "foreign_buy": 1000000,
-    "foreign_sell": 800000,
-    "foreign_net": 200000,
-    "trust_buy": 500000,
-    "trust_sell": 300000,
-    "trust_net": 200000,
-    "dealer_buy": 100000,
-    "dealer_sell": 80000,
-    "dealer_net": 20000
-  }
-}
-```
-
-### 融資融券
-
-```
-GET /margin/{stock_id}
-
-回傳格式:
-{
-  "success": true,
-  "data": {
-    "stock_id": "2330",
-    "date": "2024-01-01",
-    "margin_buy": 1000,
-    "margin_sell": 800,
-    "margin_balance": 50000,
-    "short_buy": 500,
-    "short_sell": 300,
-    "short_balance": 10000
-  }
-}
-```
+1. **一定要設定 `FUBON_SERVICE_API_KEY`**，並使用長隨機字串
+2. **防火牆只放行主電腦的 IP** 連 8081 端口
+   ```powershell
+   # Windows 範例：只允許 192.168.1.50 連入 8081
+   New-NetFirewallRule -DisplayName "Fubon Service" -Direction Inbound `
+     -LocalPort 8081 -Protocol TCP -RemoteAddress 192.168.1.50 -Action Allow
+   ```
+3. **憑證檔與密碼不進 git**：`.pfx`、`.env` 都要在 `.gitignore`
+4. 不要把此服務暴露到公網（不要設 port forwarding）
 
 ## 故障排除
 
-### 1. 無法連接富邦 SDK
-
-```
-錯誤: fubon_sdk 未安裝
-解決: pip install fubon-sdk
-```
-
-### 2. API Key 錯誤
-
-```
-錯誤: 富邦 SDK 連接失敗
-解決: 檢查 FUBON_API_KEY、FUBON_API_SECRET、FUBON_ACCOUNT 是否正確
-```
-
-### 3. 無法連接服務
-
-```
-錯誤: requests.exceptions.ConnectionError
-解決: 
-1. 確認富邦服務已啟動
-2. 確認防火牆允許 8081 端口
-3. 確認 IP 地址正確
-```
-
-### 4. 端口被占用
-
-```
-錯誤: [Errno 98] Address already in use
-解決: 
-1. 更改端口: export FUBON_SERVICE_PORT=8082
-2. 或殺死占用端口的程序: lsof -i :8081
-```
-
-## 安全注意事項
-
-1. **不要將 API Key 提交到 Git**
-   - 使用環境變數
-   - 或使用 `.env` 檔案（已加入 .gitignore）
-
-2. **限制服務訪問**
-   - 只允許本地網路訪問
-   - 或使用 VPN
-
-3. **定期更換 API Key**
-   - 每 3-6 個月更換一次
-
-## 下一步
-
-成功連接後，可以：
-
-1. 使用即時報價進行自動交易
-2. 使用財報數據進行基本面分析
-3. 使用法人數據進行籌碼面分析
-4. 結合 AI 進行綜合分析
+| 症狀 | 處理 |
+|------|------|
+| `fubon_neo 未安裝` | `pip install fubon-neo` 或安裝官網 wheel |
+| 登入失敗 | 檢查身分證字號/密碼/憑證路徑與密碼；確認已申請 API 使用權 |
+| 行情未就緒（marketdata_ready: false） | 帳務查詢仍可用；檢查網路與行情權限 |
+| 401 Unauthorized | 請求缺 `X-API-Key` 標頭或金鑰不符 |
+| 主電腦連不上 | 確認服務已啟動、防火牆放行、IP 正確 |

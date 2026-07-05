@@ -1,276 +1,288 @@
 """
-富邦證券 SDK 獨立服務
-在有 fubon_sdk 的電腦上執行，提供 HTTP API 給 OpenClaw Agent 調用
+富邦證券 SDK 獨立服務（唯讀）
+在有 fubon_neo SDK 的電腦上執行，提供 HTTP API 給主電腦的分析系統 / OpenClaw 調用
 回傳格式：JSON
 
+本服務只提供「查詢」功能（持股、損益、報價、歷史K線），不提供下單。
+
 使用方式:
-1. 在有富邦 SDK 的電腦上執行: python fubon_service.py
-2. OpenClaw Agent 透過 HTTP 調用此服務
+1. 從富邦官網申請 API 使用權並下載憑證（.pfx）
+2. 安裝 SDK: pip install fubon-neo（或使用官網下載的 wheel）
+3. 設定環境變數（見檔尾說明或 docs/FUBON_SETUP.md）
+4. 執行: python fubon_service.py
 """
 
-import asyncio
-import json
-from datetime import datetime
-from typing import Dict, Optional
+import hmac
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query
 from loguru import logger
 
-# 嘗試導入富邦 SDK
+# 嘗試導入富邦 SDK（官方套件名為 fubon_neo）
 try:
-    from fubon_sdk.constant import MarketType, OrderType, PriceType, TimeInForce
-    from fubon_sdk.sdk import FubonSDK
+    from fubon_neo.sdk import FubonSDK
 
     FUBON_AVAILABLE = True
 except ImportError:
     FUBON_AVAILABLE = False
-    logger.warning("fubon_sdk 未安裝，請先安裝: pip install fubon-sdk")
+    logger.warning("fubon_neo 未安裝，請先安裝: pip install fubon-neo")
 
 
 # ──────────────────────────────────────────────
-#  配置
+#  配置（全部由環境變數提供，勿寫死在程式碼）
 # ──────────────────────────────────────────────
 
-# 從環境變數讀取配置
-import os
-
-API_KEY = os.getenv("FUBON_API_KEY", "")
-API_SECRET = os.getenv("FUBON_API_SECRET", "")
-ACCOUNT = os.getenv("FUBON_ACCOUNT", "")
+PERSONAL_ID = os.getenv("FUBON_PERSONAL_ID", "")  # 身分證字號
+PASSWORD = os.getenv("FUBON_PASSWORD", "")  # 登入密碼
+CERT_PATH = os.getenv("FUBON_CERT_PATH", "")  # 憑證檔（.pfx）完整路徑
+CERT_PASS = os.getenv("FUBON_CERT_PASS", "")  # 憑證密碼（未設定則不帶）
 PORT = int(os.getenv("FUBON_SERVICE_PORT", "8081"))
+# 服務自身的存取金鑰：本服務會回傳真實持股與損益，強烈建議設定。
+# 設定後所有資料端點都要求 X-API-Key 標頭；/health 除外。
+SERVICE_API_KEY = os.getenv("FUBON_SERVICE_API_KEY", "")
 
 
 # ──────────────────────────────────────────────
-#  富邦 SDK 封裝
+#  SDK 物件 → JSON 序列化
+# ──────────────────────────────────────────────
+
+
+def to_jsonable(obj: Any) -> Any:
+    """把 fubon_neo 回傳的物件（Rust/pyo3 物件、巢狀結構）轉成可 JSON 化的型別。
+
+    SDK 物件沒有 __dict__，改走 dir() 取公開屬性；不同 SDK 版本欄位增減
+    也能容錯，不需要逐欄位維護對照表。
+    """
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {str(k): to_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_jsonable(v) for v in obj]
+
+    fields: Dict[str, Any] = {}
+    for name in dir(obj):
+        if name.startswith("_"):
+            continue
+        try:
+            value = getattr(obj, name)
+        except Exception:
+            continue
+        if callable(value):
+            continue
+        fields[name] = to_jsonable(value)
+    return fields if fields else str(obj)
+
+
+# ──────────────────────────────────────────────
+#  富邦 SDK 封裝（唯讀）
 # ──────────────────────────────────────────────
 
 
 class FubonService:
-    """富邦 SDK 服務封裝"""
+    """富邦 SDK 服務封裝：登入、帳務查詢、行情查詢"""
 
     def __init__(self):
         self.sdk = None
+        self.accounts: List[Any] = []
         self.connected = False
+        self.marketdata_ready = False
         self._connect()
 
     def _connect(self):
-        """連接富邦 API"""
+        """登入富邦 SDK 並初始化行情連線"""
         if not FUBON_AVAILABLE:
-            logger.error("fubon_sdk 未安裝")
+            logger.error("fubon_neo 未安裝，服務將以未連接狀態啟動")
             return
 
-        if not API_KEY or not API_SECRET:
-            logger.error("未設定 FUBON_API_KEY 或 FUBON_API_SECRET")
+        if not PERSONAL_ID or not PASSWORD or not CERT_PATH:
+            logger.error(
+                "未設定 FUBON_PERSONAL_ID / FUBON_PASSWORD / FUBON_CERT_PATH，"
+                "服務將以未連接狀態啟動"
+            )
+            return
+
+        if not os.path.exists(CERT_PATH):
+            logger.error(f"憑證檔不存在: {CERT_PATH}")
             return
 
         try:
             self.sdk = FubonSDK()
-            self.sdk.login(API_KEY, API_SECRET, ACCOUNT)
+            # 富邦 Neo SDK 登入：身分證字號 + 密碼 + 憑證檔（+ 憑證密碼）
+            if CERT_PASS:
+                result = self.sdk.login(PERSONAL_ID, PASSWORD, CERT_PATH, CERT_PASS)
+            else:
+                result = self.sdk.login(PERSONAL_ID, PASSWORD, CERT_PATH)
+
+            if not getattr(result, "is_success", False):
+                logger.error(f"富邦 SDK 登入失敗: {getattr(result, 'message', result)}")
+                return
+
+            self.accounts = result.data or []
             self.connected = True
-            logger.info("富邦 SDK 連接成功")
+            logger.info(f"富邦 SDK 登入成功，共 {len(self.accounts)} 個帳戶")
+
+            # 初始化行情（報價 / 歷史K線需要）
+            try:
+                self.sdk.init_realtime()
+                self.marketdata_ready = True
+                logger.info("富邦行情連線初始化完成")
+            except Exception as e:
+                logger.warning(f"行情初始化失敗（帳務查詢仍可用）: {e}")
+
         except Exception as e:
             logger.error(f"富邦 SDK 連接失敗: {e}")
             self.connected = False
 
-    def is_connected(self) -> bool:
-        """檢查連接狀態"""
-        return self.connected
+    # ── 共用 ───────────────────────────────────
 
-    def get_realtime_quote(self, stock_id: str) -> Dict:
-        """取得即時報價"""
-        if not self.is_connected():
-            return {
-                "success": False,
-                "error": "SDK 未連接",
-                "data": self._mock_quote(stock_id),
-            }
+    def _get_account(self, index: int = 0):
+        if not self.connected:
+            raise HTTPException(status_code=503, detail="富邦 SDK 未連接")
+        if index < 0 or index >= len(self.accounts):
+            raise HTTPException(
+                status_code=400,
+                detail=f"帳戶索引超出範圍（共 {len(self.accounts)} 個帳戶）",
+            )
+        return self.accounts[index]
 
+    @staticmethod
+    def _unwrap(result) -> Dict:
+        """把 SDK 的 Result 物件轉成統一的 JSON 回應"""
+        if getattr(result, "is_success", False):
+            return {"success": True, "data": to_jsonable(result.data)}
+        return {
+            "success": False,
+            "error": str(getattr(result, "message", "SDK 回傳失敗")),
+        }
+
+    @staticmethod
+    def _clean_symbol(stock_id: str) -> str:
+        """去除 .TW / .TWO 後綴（富邦 SDK 使用純代碼）"""
+        return stock_id.replace(".TWO", "").replace(".TW", "").strip()
+
+    # ── 帳務（真實持股） ────────────────────────
+
+    def get_accounts(self) -> Dict:
+        """帳戶清單"""
+        if not self.connected:
+            raise HTTPException(status_code=503, detail="富邦 SDK 未連接")
+        return {"success": True, "data": to_jsonable(self.accounts)}
+
+    def get_positions(self, account_index: int = 0) -> Dict:
+        """持股庫存"""
+        account = self._get_account(account_index)
         try:
-            quote = self.sdk.get_quote(stock_id)
+            result = self.sdk.accounting.inventories(account)
+            return self._unwrap(result)
+        except Exception as e:
+            logger.error(f"查詢持股失敗: {e}")
+            return {"success": False, "error": str(e)}
 
-            result = {
-                "stock_id": stock_id,
+    def get_unrealized_pnl(self, account_index: int = 0) -> Dict:
+        """未實現損益"""
+        account = self._get_account(account_index)
+        try:
+            result = self.sdk.accounting.unrealized_gains_and_loses(account)
+            return self._unwrap(result)
+        except Exception as e:
+            logger.error(f"查詢未實現損益失敗: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_bank_balance(self, account_index: int = 0) -> Dict:
+        """交割銀行餘額"""
+        account = self._get_account(account_index)
+        try:
+            result = self.sdk.accounting.bank_remain(account)
+            return self._unwrap(result)
+        except Exception as e:
+            logger.error(f"查詢銀行餘額失敗: {e}")
+            return {"success": False, "error": str(e)}
+
+    # ── 行情 ───────────────────────────────────
+
+    def _rest_stock(self):
+        if not self.connected:
+            raise HTTPException(status_code=503, detail="富邦 SDK 未連接")
+        if not self.marketdata_ready:
+            raise HTTPException(status_code=503, detail="富邦行情連線未初始化")
+        return self.sdk.marketdata.rest_client.stock
+
+    def get_quote(self, stock_id: str) -> Dict:
+        """即時報價（REST 快照）"""
+        symbol = self._clean_symbol(stock_id)
+        try:
+            quote = self._rest_stock().intraday.quote(symbol=symbol)
+            return {"success": True, "data": to_jsonable(quote)}
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"即時報價失敗 {symbol}: {e}")
+            return {"success": False, "error": str(e)}
+
+    def get_historical(self, stock_id: str, days: int = 365) -> Dict:
+        """歷史日K線"""
+        symbol = self._clean_symbol(stock_id)
+        try:
+            end = datetime.now().strftime("%Y-%m-%d")
+            start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+            # "from" 是 Python 保留字，須以 dict 解包傳入
+            candles = self._rest_stock().historical.candles(
+                **{"symbol": symbol, "from": start, "to": end}
+            )
+            return {"success": True, "data": to_jsonable(candles)}
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"歷史資料失敗 {symbol}: {e}")
+            return {"success": False, "error": str(e)}
+
+    # ── 綜合：一次取得投資組合全貌 ──────────────
+
+    def get_portfolio_summary(self, account_index: int = 0) -> Dict:
+        """持股 + 未實現損益 + 各持股即時報價（給 AI 產生投資建議用）"""
+        positions = self.get_positions(account_index)
+        pnl = self.get_unrealized_pnl(account_index)
+
+        quotes: Dict[str, Any] = {}
+        if positions.get("success") and self.marketdata_ready:
+            for item in positions.get("data") or []:
+                symbol = None
+                if isinstance(item, dict):
+                    symbol = item.get("stock_no") or item.get("symbol")
+                if not symbol:
+                    continue
+                quotes[symbol] = self.get_quote(symbol)
+
+        return {
+            "success": True,
+            "data": {
                 "timestamp": datetime.now().isoformat(),
-                "price_info": {
-                    "current": float(quote.get("price", 0)),
-                    "open": float(quote.get("open", 0)),
-                    "high": float(quote.get("high", 0)),
-                    "low": float(quote.get("low", 0)),
-                    "close": float(quote.get("close", 0)),
-                    "previous_close": float(quote.get("previous_close", 0)),
-                    "change": float(quote.get("change", 0)),
-                    "change_percent": float(quote.get("change_percent", 0)),
-                },
-                "volume_info": {
-                    "volume": int(quote.get("volume", 0)),
-                    "amount": float(quote.get("amount", 0)),
-                    "avg_price": float(quote.get("avg_price", 0)),
-                },
-                "orderbook": {
-                    "bid": [
-                        {
-                            "price": float(quote.get(f"bid_price_{i}", 0)),
-                            "volume": int(quote.get(f"bid_volume_{i}", 0)),
-                        }
-                        for i in range(1, 6)
-                    ],
-                    "ask": [
-                        {
-                            "price": float(quote.get(f"ask_price_{i}", 0)),
-                            "volume": int(quote.get(f"ask_volume_{i}", 0)),
-                        }
-                        for i in range(1, 6)
-                    ],
-                },
-                "source": "fubon_realtime",
-            }
+                "positions": positions,
+                "unrealized_pnl": pnl,
+                "quotes": quotes,
+            },
+        }
 
-            return {"success": True, "data": result}
 
-        except Exception as e:
-            logger.error(f"即時報價失敗: {e}")
-            return {"success": False, "error": str(e)}
+# ──────────────────────────────────────────────
+#  存取控制
+# ──────────────────────────────────────────────
 
-    def get_historical(
-        self, stock_id: str, days: int = 365, interval: str = "1d"
-    ) -> Dict:
-        """取得歷史資料"""
-        if not self.is_connected():
-            return {"success": False, "error": "SDK 未連接"}
 
-        try:
-            from datetime import timedelta
-
-            end_date = datetime.now().strftime("%Y-%m-%d")
-            start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-
-            bars = self.sdk.get_bars(stock_id, start_date, end_date, interval)
-
-            data = []
-            for bar in bars:
-                data.append(
-                    {
-                        "date": str(bar.get("date", "")),
-                        "open": float(bar.get("open", 0)),
-                        "high": float(bar.get("high", 0)),
-                        "low": float(bar.get("low", 0)),
-                        "close": float(bar.get("close", 0)),
-                        "volume": int(bar.get("volume", 0)),
-                    }
-                )
-
-            return {
-                "success": True,
-                "data": {
-                    "stock_id": stock_id,
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "interval": interval,
-                    "count": len(data),
-                    "data": data,
-                    "source": "fubon_historical",
-                },
-            }
-
-        except Exception as e:
-            logger.error(f"歷史資料失敗: {e}")
-            return {"success": False, "error": str(e)}
-
-    def get_financial(self, stock_id: str, report_type: str = "ratios") -> Dict:
-        """取得財報數據"""
-        if not self.is_connected():
-            return {"success": False, "error": "SDK 未連接"}
-
-        try:
-            if report_type == "income":
-                report = self.sdk.get_income_statement(stock_id)
-            elif report_type == "balance":
-                report = self.sdk.get_balance_sheet(stock_id)
-            elif report_type == "cashflow":
-                report = self.sdk.get_cash_flow(stock_id)
-            elif report_type == "ratios":
-                report = self.sdk.get_financial_ratios(stock_id)
-            else:
-                raise ValueError(f"未知的報表類型: {report_type}")
-
-            return {
-                "success": True,
-                "data": {
-                    "stock_id": stock_id,
-                    "report_type": report_type,
-                    "period": report.get("period", ""),
-                    "data": report.get("data", {}),
-                    "source": "fubon_financial",
-                },
-            }
-
-        except Exception as e:
-            logger.error(f"財報失敗: {e}")
-            return {"success": False, "error": str(e)}
-
-    def get_institutional(self, stock_id: str) -> Dict:
-        """取得三大法人"""
-        if not self.is_connected():
-            return {"success": False, "error": "SDK 未連接"}
-
-        try:
-            data = self.sdk.get_institutional(stock_id)
-
-            return {
-                "success": True,
-                "data": {
-                    "stock_id": stock_id,
-                    "date": data.get("date", ""),
-                    "foreign_buy": float(data.get("foreign_buy", 0)),
-                    "foreign_sell": float(data.get("foreign_sell", 0)),
-                    "foreign_net": float(data.get("foreign_net", 0)),
-                    "trust_buy": float(data.get("trust_buy", 0)),
-                    "trust_sell": float(data.get("trust_sell", 0)),
-                    "trust_net": float(data.get("trust_net", 0)),
-                    "dealer_buy": float(data.get("dealer_buy", 0)),
-                    "dealer_sell": float(data.get("dealer_sell", 0)),
-                    "dealer_net": float(data.get("dealer_net", 0)),
-                    "source": "fubon_institutional",
-                },
-            }
-
-        except Exception as e:
-            logger.error(f"法人資料失敗: {e}")
-            return {"success": False, "error": str(e)}
-
-    def get_margin(self, stock_id: str) -> Dict:
-        """取得融資融券"""
-        if not self.is_connected():
-            return {"success": False, "error": "SDK 未連接"}
-
-        try:
-            data = self.sdk.get_margin(stock_id)
-
-            return {
-                "success": True,
-                "data": {
-                    "stock_id": stock_id,
-                    "date": data.get("date", ""),
-                    "margin_buy": float(data.get("margin_buy", 0)),
-                    "margin_sell": float(data.get("margin_sell", 0)),
-                    "margin_balance": float(data.get("margin_balance", 0)),
-                    "short_buy": float(data.get("short_buy", 0)),
-                    "short_sell": float(data.get("short_sell", 0)),
-                    "short_balance": float(data.get("short_balance", 0)),
-                    "source": "fubon_margin",
-                },
-            }
-
-        except Exception as e:
-            logger.error(f"融資融券失敗: {e}")
-            return {"success": False, "error": str(e)}
-
-    def _mock_quote(self, stock_id: str) -> Dict:
-        """模擬報價"""
-        return {"stock_id": stock_id, "price_info": {"current": 0}, "source": "mock"}
+async def verify_service_key(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    """驗證 X-API-Key。未設定 FUBON_SERVICE_API_KEY 時放行（僅建議在隔離網路使用）。"""
+    if not SERVICE_API_KEY:
+        return
+    if not x_api_key or not hmac.compare_digest(x_api_key, SERVICE_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
 # ──────────────────────────────────────────────
@@ -278,19 +290,13 @@ class FubonService:
 # ──────────────────────────────────────────────
 
 app = FastAPI(
-    title="富邦證券 SDK 服務",
-    description="提供即時報價、歷史資料、財報數據、籌碼面資料",
-    version="1.0.0",
+    title="富邦證券 SDK 服務（唯讀）",
+    description="提供帳戶持股、未實現損益、即時報價、歷史K線；不提供下單",
+    version="2.0.0",
 )
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# 資料端點統一掛 API key 驗證；/health 與 / 不需驗證
+router = APIRouter(dependencies=[Depends(verify_service_key)])
 
 # 全局服務實例
 fubon_service = FubonService()
@@ -300,16 +306,18 @@ fubon_service = FubonService()
 async def root():
     """根端點"""
     return {
-        "service": "富邦證券 SDK 服務",
-        "status": "connected" if fubon_service.is_connected() else "disconnected",
+        "service": "富邦證券 SDK 服務（唯讀）",
+        "status": "connected" if fubon_service.connected else "disconnected",
+        "auth_enabled": bool(SERVICE_API_KEY),
         "endpoints": [
             "/health",
+            "/accounts",
+            "/positions",
+            "/pnl/unrealized",
+            "/balance",
+            "/portfolio/summary",
             "/quote/{stock_id}",
             "/historical/{stock_id}",
-            "/financial/{stock_id}",
-            "/institutional/{stock_id}",
-            "/margin/{stock_id}",
-            "/comprehensive/{stock_id}",
         ],
     }
 
@@ -319,65 +327,62 @@ async def health_check():
     """健康檢查"""
     return {
         "status": "healthy",
-        "fubon_connected": fubon_service.is_connected(),
+        "fubon_connected": fubon_service.connected,
+        "marketdata_ready": fubon_service.marketdata_ready,
+        "accounts": len(fubon_service.accounts),
+        "auth_enabled": bool(SERVICE_API_KEY),
         "timestamp": datetime.now().isoformat(),
     }
 
 
-@app.get("/quote/{stock_id}")
+@router.get("/accounts")
+async def get_accounts():
+    """帳戶清單"""
+    return fubon_service.get_accounts()
+
+
+@router.get("/positions")
+async def get_positions(account_index: int = Query(0, description="帳戶索引")):
+    """持股庫存"""
+    return fubon_service.get_positions(account_index)
+
+
+@router.get("/pnl/unrealized")
+async def get_unrealized_pnl(account_index: int = Query(0, description="帳戶索引")):
+    """未實現損益"""
+    return fubon_service.get_unrealized_pnl(account_index)
+
+
+@router.get("/balance")
+async def get_balance(account_index: int = Query(0, description="帳戶索引")):
+    """交割銀行餘額"""
+    return fubon_service.get_bank_balance(account_index)
+
+
+@router.get("/portfolio/summary")
+async def get_portfolio_summary(
+    account_index: int = Query(0, description="帳戶索引"),
+):
+    """投資組合全貌：持股 + 未實現損益 + 即時報價"""
+    return fubon_service.get_portfolio_summary(account_index)
+
+
+@router.get("/quote/{stock_id}")
 async def get_quote(stock_id: str):
-    """取得即時報價"""
-    return fubon_service.get_realtime_quote(stock_id)
+    """即時報價"""
+    return fubon_service.get_quote(stock_id)
 
 
-@app.get("/historical/{stock_id}")
+@router.get("/historical/{stock_id}")
 async def get_historical(
     stock_id: str,
-    days: int = Query(365, description="歷史天數"),
-    interval: str = Query("1d", description="資料間隔 (1m, 5m, 15m, 30m, 1h, 1d)"),
+    days: int = Query(365, ge=1, le=1825, description="歷史天數"),
 ):
-    """取得歷史資料"""
-    return fubon_service.get_historical(stock_id, days, interval)
+    """歷史日K線"""
+    return fubon_service.get_historical(stock_id, days)
 
 
-@app.get("/financial/{stock_id}")
-async def get_financial(
-    stock_id: str,
-    report_type: str = Query(
-        "ratios", description="報表類型 (income, balance, cashflow, ratios)"
-    ),
-):
-    """取得財報數據"""
-    return fubon_service.get_financial(stock_id, report_type)
-
-
-@app.get("/institutional/{stock_id}")
-async def get_institutional(stock_id: str):
-    """取得三大法人"""
-    return fubon_service.get_institutional(stock_id)
-
-
-@app.get("/margin/{stock_id}")
-async def get_margin(stock_id: str):
-    """取得融資融券"""
-    return fubon_service.get_margin(stock_id)
-
-
-@app.get("/comprehensive/{stock_id}")
-async def get_comprehensive(stock_id: str):
-    """取得綜合資料"""
-    return {
-        "success": True,
-        "data": {
-            "stock_id": stock_id,
-            "timestamp": datetime.now().isoformat(),
-            "realtime": fubon_service.get_realtime_quote(stock_id),
-            "historical": fubon_service.get_historical(stock_id, days=30),
-            "financial": fubon_service.get_financial(stock_id, "ratios"),
-            "institutional": fubon_service.get_institutional(stock_id),
-            "margin": fubon_service.get_margin(stock_id),
-        },
-    }
+app.include_router(router)
 
 
 # ──────────────────────────────────────────────
@@ -387,30 +392,39 @@ async def get_comprehensive(stock_id: str):
 if __name__ == "__main__":
     print(f"""
 ╔══════════════════════════════════════════════════════════════╗
-║              富邦證券 SDK 服務                               ║
+║              富邦證券 SDK 服務（唯讀 v2）                     ║
 ╠══════════════════════════════════════════════════════════════╣
-║  API Key: {API_KEY[:10] if API_KEY else '未設定':<20}                  ║
-║  狀態: {'已連接' if fubon_service.is_connected() else '未連接':<20}                      ║
-║  端口: {PORT:<20}                      ║
+║  SDK 狀態: {"已連接" if fubon_service.connected else "未連接":<10}                                     ║
+║  行情狀態: {"就緒" if fubon_service.marketdata_ready else "未就緒":<10}                                     ║
+║  存取驗證: {"已啟用" if SERVICE_API_KEY else "未啟用（建議設定 FUBON_SERVICE_API_KEY）":<10}  ║
+║  端口: {PORT}                                                  ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  API 端點:                                                   ║
-║    GET /quote/{{stock_id}}         即時報價                   ║
-║    GET /historical/{{stock_id}}    歷史資料                   ║
-║    GET /financial/{{stock_id}}     財報數據                   ║
-║    GET /institutional/{{stock_id}} 三大法人                   ║
-║    GET /margin/{{stock_id}}        融資融券                   ║
-║    GET /comprehensive/{{stock_id}} 綜合資料                   ║
+║    GET /health               健康檢查（免驗證）              ║
+║    GET /accounts             帳戶清單                        ║
+║    GET /positions            持股庫存                        ║
+║    GET /pnl/unrealized       未實現損益                      ║
+║    GET /balance              交割銀行餘額                    ║
+║    GET /portfolio/summary    持股+損益+報價 綜合             ║
+║    GET /quote/{{stock_id}}     即時報價                       ║
+║    GET /historical/{{stock_id}} 歷史K線                       ║
 ╠══════════════════════════════════════════════════════════════╣
-║  使用方式:                                                   ║
-║    設定環境變數:                                             ║
-║      export FUBON_API_KEY=your_key                          ║
-║      export FUBON_API_SECRET=your_secret                    ║
-║      export FUBON_ACCOUNT=your_account                      ║
-║                                                              ║
-║    啟動服務:                                                 ║
-║      python fubon_service.py                                 ║
+║  環境變數:                                                   ║
+║    FUBON_PERSONAL_ID     身分證字號                          ║
+║    FUBON_PASSWORD        登入密碼                            ║
+║    FUBON_CERT_PATH       憑證檔(.pfx)路徑                    ║
+║    FUBON_CERT_PASS       憑證密碼（選填）                    ║
+║    FUBON_SERVICE_API_KEY 服務存取金鑰（強烈建議）            ║
+║    FUBON_SERVICE_PORT    服務端口（預設 8081）               ║
 ╚══════════════════════════════════════════════════════════════╝
     """)
 
+    if not SERVICE_API_KEY:
+        logger.warning(
+            "未設定 FUBON_SERVICE_API_KEY！此服務會回傳真實持股與損益，"
+            "任何能連到此端口的裝置都能讀取。請設定金鑰並搭配防火牆限制來源 IP。"
+        )
+
     # 富邦 SDK 服務刻意綁定所有介面，供主機（另一台電腦）透過區網連線；屬設計需求。
+    # 請務必設定 FUBON_SERVICE_API_KEY 並以防火牆限制來源。
     uvicorn.run(app, host="0.0.0.0", port=PORT)  # nosec B104

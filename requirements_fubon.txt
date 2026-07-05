@@ -1,8 +1,9 @@
 # 富邦證券 SDK 服務依賴清單
 # 在有富邦 SDK 的電腦上安裝
 
-# 富邦 SDK (需要從富邦官網下載)
-# fubon-sdk
+# 富邦 Neo SDK（官方套件名 fubon-neo；若 pip 安裝失敗，
+# 請至富邦官網「新一代API」頁面下載對應平台的 wheel 檔安裝）
+fubon-neo
 
 # Web 框架
 fastapi>=0.100.0
@@ -10,10 +11,3 @@ uvicorn>=0.23.0
 
 # 日誌
 loguru>=0.7.0
-
-# HTTP 客戶端
-requests>=2.31.0
-
-# 資料處理
-pandas>=2.0.0
-numpy>=1.24.0

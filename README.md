@@ -34,6 +34,8 @@ python main.py
 - 📊 **研究報告** — 自動產生持股研究報告
 - ⏰ **自動排程** — 內建排程服務，自動產生報告
 - 🤖 **AI 聊天** — 問答式股票分析師
+- 📰 **財經新聞** — 個股新聞（FinMind）、市場新聞（鉅亨網）、重大訊息（TWSE）
+- 💰 **真實持股整合** — 透過富邦 SDK 服務查詢持股與未實現損益（唯讀）
 
 ### 啟動伺服器
 
@@ -78,6 +80,15 @@ python main.py
 |------|------|------|
 | `/api/v1/analysis/{stock_id}/technical` | GET | 技術分析 |
 | `/api/v1/prediction/{stock_id}` | GET | ML 預測 |
+
+### 財經新聞
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
+| `/api/v1/news/{stock_id}` | GET | 個股新聞（FinMind） |
+| `/api/v1/news/market` | GET | 台股市場新聞（鉅亨網） |
+| `/api/v1/news/announcements` | GET | 上市公司重大訊息（TWSE） |
+| `/api/v1/news/digest?stock_ids=2330,2454` | GET | 多檔持股新聞摘要 |
 
 ## 專案結構
 
@@ -144,9 +155,10 @@ curl -X POST "http://localhost:9999/api/v1/db/sync/2330.TW?months=12"
 curl "http://localhost:9999/api/v1/twse/daily"
 ```
 
-## 富邦證券 SDK 整合
+## 富邦證券 SDK 整合（真實持股，唯讀）
 
-系統支援整合富邦證券 SDK，提供即時報價、完整財報、籌碼面數據。
+透過富邦 Neo SDK（`fubon_neo`）查詢**真實帳戶持股、未實現損益、即時報價**。
+服務為唯讀設計，不提供下單。
 
 ### 架構
 
@@ -159,24 +171,35 @@ curl "http://localhost:9999/api/v1/twse/daily"
 └──────────────────┘         └──────────────────┘
 ```
 
-### 安裝步驟
+### 安裝步驟（在有富邦 SDK 的電腦上）
 
-1. 在有富邦 SDK 的電腦上執行：
-```bash
+```powershell
 pip install -r requirements_fubon.txt
-export FUBON_API_KEY=your_key
-export FUBON_API_SECRET=your_secret
+
+# 富邦 Neo SDK 用身分證 + 密碼 + 電子憑證登入
+$env:FUBON_PERSONAL_ID = "A123456789"
+$env:FUBON_PASSWORD = "登入密碼"
+$env:FUBON_CERT_PATH = "C:\certs\憑證.pfx"
+$env:FUBON_CERT_PASS = "憑證密碼"
+$env:FUBON_SERVICE_API_KEY = "自訂長隨機字串"
+
 python fubon_service.py
 ```
 
-2. 在主電腦連接：
-```python
-from agents.openclaw_agent import get_openclaw_agent
-agent = get_openclaw_agent(fubon_service_url="http://192.168.1.100:8081")
-result = await agent.analyze_stock("2330.TW")
+主電腦查詢持股：
+
+```bash
+curl -H "X-API-Key: 金鑰" "http://<SDK電腦IP>:8081/portfolio/summary"
 ```
 
-詳細說明請參考 [富邦 SDK 整合指南](docs/FUBON_SETUP.md)
+詳細說明（含防火牆設定與故障排除）請參考 [富邦 SDK 整合指南](docs/FUBON_SETUP.md)
+
+## OpenClaw 整合
+
+正確方向是 **OpenClaw 當大腦、本系統當工具**：把
+[openclaw_skills/taiwan-stock/SKILL.md](openclaw_skills/taiwan-stock/SKILL.md)
+複製到 OpenClaw 工作區的 `skills/` 目錄，OpenClaw 就能自行呼叫本系統與
+富邦服務的 HTTP API，完成「看持股 → 抓新聞 → 產生投資建議」的完整流程。
 
 ## 開發筆記
 
@@ -200,7 +223,8 @@ result = await agent.analyze_stock("2330.TW")
 | 公開資訊觀測站 (MOPS) | ✅ | 三大報表 |
 | TWSE OpenAPI | ✅ | 基本財務指標 |
 | Yahoo Finance | ✅ | 財報、估值 |
-| **富邦證券 SDK** | ✅ | 即時報價、完整財報、籌碼 |
+| FinMind | ✅ | 個股新聞、法人、財報 |
+| **富邦證券 SDK** | ✅ | 即時報價、持股與損益（無財報 API） |
 
 ## 授權
 

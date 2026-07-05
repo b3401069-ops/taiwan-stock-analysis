@@ -163,3 +163,9 @@ logs/
 config/local.py
 config/local.yaml
 config/local.json
+
+# 憑證檔（富邦電子憑證等，絕不進版控）
+*.pfx
+*.p12
+*.pem
+*.key

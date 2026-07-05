@@ -31,6 +31,7 @@ from api.services import AnalysisService, RecommendationService, StockService
 from data.dividend_fetcher import get_dividend_fetcher
 from data.financial_fetcher import get_financial_fetcher
 from data.finmind_fetcher import get_finmind_fetcher
+from data.news_fetcher import get_news_fetcher
 from data.twse_fetcher import get_twse_fetcher
 from models.db_manager import get_db_manager
 from services.notification import get_notification_service
@@ -977,6 +978,65 @@ async def get_finmind_taiex():
     try:
         fetcher = get_finmind_fetcher()
         return fetcher.get_taiex()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ──────────────────────────────────────────────
+#  財經新聞端點
+#  注意：固定路徑（market/announcements/digest）須排在 /news/{stock_id} 之前
+# ──────────────────────────────────────────────
+@router.get("/news/market", summary="台股市場新聞")
+async def get_market_news(limit: int = Query(20, ge=1, le=30, description="回傳則數")):
+    """取得台股市場最新新聞（鉅亨網）"""
+    try:
+        fetcher = get_news_fetcher()
+        return fetcher.get_market_news(limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/news/announcements", summary="上市公司重大訊息")
+async def get_material_announcements(
+    stock_id: Optional[str] = Query(None, description="股票代碼（不填則回傳全部）"),
+    limit: int = Query(50, ge=1, le=200, description="回傳則數"),
+):
+    """取得上市公司重大訊息公告（TWSE OpenAPI）"""
+    try:
+        fetcher = get_news_fetcher()
+        return fetcher.get_material_announcements(stock_id=stock_id, limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/news/digest", summary="投資組合新聞摘要")
+async def get_portfolio_news_digest(
+    stock_ids: str = Query(..., description="股票代碼清單（逗號分隔，如 2330,2454）"),
+    days: int = Query(7, ge=1, le=30, description="個股新聞回溯天數"),
+):
+    """一次取得多檔持股的新聞 + 重大訊息 + 市場新聞（供 AI 產生投資建議）"""
+    try:
+        ids = [s.strip() for s in stock_ids.split(",") if s.strip()]
+        if not ids:
+            raise HTTPException(status_code=400, detail="stock_ids 不可為空")
+        fetcher = get_news_fetcher()
+        return fetcher.get_portfolio_news_digest(ids, days=days)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/news/{stock_id}", summary="個股新聞")
+async def get_stock_news(
+    stock_id: str,
+    days: int = Query(7, ge=1, le=90, description="回溯天數"),
+    limit: int = Query(20, ge=1, le=50, description="回傳則數"),
+):
+    """取得個股相關新聞（FinMind）"""
+    try:
+        fetcher = get_news_fetcher()
+        return fetcher.get_stock_news(stock_id, days=days, limit=limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
